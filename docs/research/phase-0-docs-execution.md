@@ -107,7 +107,6 @@ GitHub renders Mermaid inline, so the SVG is a convenience for non-GitHub viewer
 
 ## Implementation Reference
 
-<!-- status-sync step appends the merged PR URL here once the PR is merged. -->
-
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#9 docs(architecture): rewrite README + system-context + dep-graph + 10 ADRs](https://github.com/goldr0g3r/tethys/pull/9)
+- Merged on: 2026-05-14 11:43:36 UTC
+- Bootstrap window: same as PR #4 / #5 / #7 (`enforce_admins` off; PR-4 re-enables when status checks land).
