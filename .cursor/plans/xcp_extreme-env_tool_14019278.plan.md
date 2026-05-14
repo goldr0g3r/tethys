@@ -28,7 +28,7 @@ todos:
     status: pending
   - id: p0-issues
     content: "Phase 0 / parallel: 12 milestones (Phase 0..Phase 11) via gh api + full label set (10 type/* + 12 phase/* + 4 prio/* + 8 area/* {master, slave, profile-marine, profile-space, transport, ci, docs, standards} + 8 special) + Phase-0 Research-Note + Epic + Phase-Acceptance issues via GitHub MCP. CODEOWNERS + branch-protection.json applied via gh api .../branches/main/protection."
-    status: pending
+    status: completed
   - id: p1
     content: "Phase 1: shared infrastructure — master package pyproject.toml (uv-managed, pinned), structlog + pydantic-settings + click CLI; slave CMake foundation with warnings-as-errors + MISRA preset + sanitisers in CI; Unity + Ceedling baseline; A2L fixture corpus checked in; posix-sim entry point. Acceptance: hello-world XCP CONNECT/DISCONNECT exchange over UDP loopback, single command line both ends."
     status: pending

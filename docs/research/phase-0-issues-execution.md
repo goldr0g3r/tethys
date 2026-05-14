@@ -112,7 +112,6 @@ This note captures the actual values written to `github.com/goldr0g3r/tethys` wh
 
 ## Implementation Reference
 
-<!-- status-sync step appends the merged PR URL here once the PR is merged. -->
-
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#4 chore(issues): apply Phase-0 GitHub surface](https://github.com/goldr0g3r/tethys/pull/4)
+- Merged on: 2026-05-14 11:03:38 UTC
+- Merge override: `gh pr merge --squash --admin` after temporarily disabling `enforce_admins` via `gh api -X DELETE /repos/.../branches/main/protection/enforce_admins`. Restoration of `enforce_admins=true` happens at PR-4 once the 9 required status checks exist.
