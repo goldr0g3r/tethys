@@ -7,7 +7,7 @@ todos:
     status: completed
   - id: p0-rules
     content: "Phase 0 / PR-2 chore(rules): .cursor/rules/*.mdc — xcp-protocol-discipline, misra-c-2023-gate, ecss-traceability, marine-profile-invariants, space-profile-invariants, no-dynamic-allocation, no-recursion-no-goto, always-cite-standards, research-note-per-phase, version-pinning, free-tool-only, conventional-commits — plus .github/instructions/ mirror, AGENTS.md, CLAUDE.md, copilot-instructions.md. Verifies discipline gates are machine-readable for both Cursor agent and GitHub Copilot reviewers."
-    status: pending
+    status: completed
   - id: p0-docs
     content: "Phase 0 / PR-3 docs(architecture): README rewrite + docs/architecture/system-context.md + dep-graph.svg + ADR-0001..ADR-0008 in MADR v3.0 format (XCP-as-development-protocol, profile-based-build-system, MISRA-C-2023-as-coding-gate, transport-abstraction-layer, no-dynamic-allocation, AES-128-seed-and-key, Python-master-not-MATLAB, license-free-toolchain). README badges: build, coverage, MISRA, fuzz-corpus-size, ECSS-objective-coverage."
     status: pending
@@ -22,10 +22,10 @@ todos:
     status: pending
   - id: p0-github-setup-runbook
     content: "Phase 0 / PR-0a docs(runbook): docs/runbooks/github-setup.md — PAT scope spec, repo visibility (public), branch protection rules, Rulesets, CODEOWNERS, Projects v2 board creation with 4 custom fields (Phase / Workstream / Layer / Type), auto-add workflow, milestones bootstrap, label set bootstrap. Pre-requisite for p0-issues."
-    status: pending
+    status: completed
   - id: p0-system-requirements-research
     content: "Phase 0 / PR-0c docs(research): docs/research/phase-0-system-requirements.md — multi-standard requirements analysis + packet-loss tolerance budgets per (profile × transport × direction × XCP service). Companion phase-0-standards-matrix.{csv,md} listing ~35 standards (incl. ISO 26262, IEC 61508, IEC 61784-3, CCSDS COP-1, IACS UR E22 Rev.3, ECSS-E-ST-40C Rev.1, DO-178C, AUTOSAR PRS E2E). ADR drafts for ADR-0001/0004/0005 + new ADR-0010 (packet-loss tolerance budget) seeded into docs/adr/drafts/, formalised by PR-3. Resolves the packet-loss tolerance open question parked for downstream phases."
-    status: pending
+    status: completed
   - id: p0-issues
     content: "Phase 0 / parallel: 12 milestones (Phase 0..Phase 11) via gh api + full label set (10 type/* + 12 phase/* + 4 prio/* + 8 area/* {master, slave, profile-marine, profile-space, transport, ci, docs, standards} + 8 special) + Phase-0 Research-Note + Epic + Phase-Acceptance issues via GitHub MCP. CODEOWNERS + branch-protection.json applied via gh api .../branches/main/protection."
     status: completed

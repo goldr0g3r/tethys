@@ -1,0 +1,46 @@
+---
+description: No PR may introduce a paid-license-required dependency; allowed toolchain per parent plan section 5
+alwaysApply: true
+---
+
+# Free-tool-only
+
+Tethys is positioned as a license-free XCP master + slave (parent plan §1, §5). No PR may introduce a dependency that requires a paid license for normal development, CI, or running the demos. ADR-0008 (when PR-3 elevates) records the repo license choice.
+
+## Allowed toolchain
+
+Documented in parent plan §5:
+
+- **Python:** Python 3.11+, uv, pyxcp (LGPLv3), Sauci/pya2l (BSD-3) preferred / christoph2/pyA2L (GPLv2) fallback, asammdf, PySide6 (LGPL), pyqtgraph, pytest, pytest-qt, ruff, mypy.
+- **Build:** GCC, Clang, arm-none-eabi-gcc, CMake, Ninja.
+- **Static analysis:** `cppcheck --addon=misra`, clang-tidy, gcc `-fanalyzer`, scan-build, optional Frama-C/WP.
+- **Coverage:** gcovr, lcov, coverage.py.
+- **Unit test:** Unity + Ceedling (C), pytest (Python).
+- **Fuzzing:** libFuzzer (built into Clang), AFL++.
+- **CI:** GitHub Actions free tier.
+- **Docs:** Sphinx + Breathe + Doxygen, MyST-Parser, PlantUML, Mermaid.
+- **SBOM + supply chain:** CycloneDX, Renovate, Dependabot, `pip-audit`, `osv-scanner`.
+- **Hardware:** CANable 2.0 (~USD 40), STM32F4/F7/H7 Nucleo (~USD 25-40 each).
+
+## Banned (without explicit ADR exception)
+
+- ETAS INCA, Vector CANape, Vector CANoe (paid; Tethys-master replaces them - parent §9).
+- MATLAB Vehicle Network Toolbox (paid add-on; Tethys uses MATLAB's free `py.` interface - parent §9).
+- LDRA, Polyspace Bug Finder, Polyspace Code Prover (paid; Tethys uses cppcheck-misra + clang-tidy + gcc -fanalyzer - parent §9).
+- Green Hills MULTI, IAR Safety (paid qualified compilers; gap documented in ADR-0008).
+
+## Process
+
+To propose a new dependency, the PR opening must include:
+
+```text
+Tool: <name>
+License: <SPDX identifier>
+Free for: <commercial / non-commercial / personal>
+Replaces: <existing free tool>, or "new capability"
+ADR: <link to ADR if architectural>
+```
+
+## CI enforcement (lands in PR-4)
+
+`dependency-review.yml` workflow uses GitHub's Dependency Review API to flag new dependencies and surface their license. A maintainer reviews the license field manually.

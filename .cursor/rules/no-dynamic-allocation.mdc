@@ -1,0 +1,42 @@
+---
+description: Dynamic allocation is banned in the slave; buffers are statically sized per ADR-0005
+globs: slave/**/*.c,slave/**/*.h
+alwaysApply: false
+---
+
+# No dynamic allocation in slave
+
+`malloc`, `calloc`, `realloc`, `free`, `aligned_alloc`, `posix_memalign`, `mmap`, `sbrk`, and all variants are banned in `slave/` source. This applies to both profiles (marine and space) and is required by:
+
+- ECSS-E-ST-40C Rev.1 (S18 in standards matrix)
+- MISRA C:2023 advisory rule set
+- ISO 26262:2018 part 6 (referenced in `docs/research/phase-0-system-requirements.md` §3.3)
+
+## Banned identifiers
+
+```c
+malloc       calloc       realloc       free
+aligned_alloc  posix_memalign  mmap  sbrk
+operator new (in any future C++ bindings)
+```
+
+## Approved patterns
+
+- Compile-time sizing via the generated header `tethys_static_memory.h` derived from `transport_max_burst_loss` + A2L `MAX_DTO` (see [`docs/adr/drafts/adr-0005-no-dynamic-allocation.md`](../../docs/adr/drafts/adr-0005-no-dynamic-allocation.md)).
+- Static / file-scope arrays sized by `TETHYS_ODT_BUFFER_SIZE`, `TETHYS_CTO_RX_SIZE`, etc.
+- Stack allocation for short-lived scratch buffers, bounded by a static `assert()` on `sizeof()` at compile time.
+
+## CI enforcement (lands in PR-4)
+
+`misra-gate.yml` workflow runs:
+
+```bash
+rg -n -w 'malloc|calloc|realloc|free|aligned_alloc|posix_memalign|mmap|sbrk' slave/
+```
+
+Any match (other than a comment line that documents the ban) fails the build.
+
+## Cross-reference
+
+- ADR-0005 draft (PR-3 elevates).
+- `docs/research/phase-0-system-requirements.md` §6 + §8 (buffer-sizing rationale).

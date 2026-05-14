@@ -1,0 +1,36 @@
+---
+description: Space profile feature constraints per parent plan section 3.3 and ADR-0002 (profile-based build system)
+globs: slave/profiles/space.cmake,slave/src/profiles/space/**,slave/include/tethys/profile_space.h
+alwaysApply: false
+---
+
+# Space profile invariants
+
+The space profile is selected via `cmake -DTETHYS_PROFILE=space`. Code under `slave/src/profiles/space/**` and `slave/profiles/space.cmake` must uphold every invariant below.
+
+## Invariants (parent plan section 3.3)
+
+| Concern | Invariant |
+| --- | --- |
+| Transports | UART/SxI wrapped in CCSDS COP-1 + CAN (1-wire fault-tolerant). No raw UART. |
+| Endianness | Fixed at compile time (per mission target). |
+| CAL page integrity | Mandatory EDAC (SEC-DED Hamming) wrapper on RAM. Flash mirror page mandatory. |
+| Watchdog | Mandatory kick on DAQ tick. XCP must never block the watchdog path. |
+| Seed-and-key | Mandatory, 16-byte AES-128 derived (ADR-0006). |
+| Flight-mode default | DAQ disabled. Enable only via authenticated service-mode command (60s inactivity timeout). |
+| STIM | Service-mode only. AES-128 unlock required. Whitelist still applies even in service mode. |
+| A2L hash | Signed binary hash in A2L header; CONNECT refused on mismatch. |
+| Logging | Budgeted ring buffer with watermark. No unbounded MDF4. |
+| Coding rules | MISRA C:2023 mandatory + required + advisory. **No recursion.** **No goto.** All loops bounded. |
+| Standards trace | ECSS-E-ST-40C Rev.1, ECSS-Q-ST-80C, NPR 7150.2D, NASA-STD-8739.8, DO-178C DAL-B, CCSDS 232.1-B-2 (COP-1), CCSDS 132.0-B-3 (TM). See standards matrix S10/S14/S16-S20/S32/S33. |
+
+## Loss budget rows (from ADR-0010 draft)
+
+Space rows: 8-11. CTO over COP-1 AD ≤ 1e-12/frame post-ARQ; CAN(1-wire FT) ≤ 1e-9/frame with mandatory EDAC.
+
+## Banned
+
+- Dynamic allocation (covered by `no-dynamic-allocation` rule but doubly banned here).
+- Recursion, `goto`, unbounded loops (covered by `no-recursion-no-goto` rule).
+- DAQ-on-by-default at flight time. Always require service-mode unlock.
+- Plaintext seed-and-key. Always 16-byte AES-128 (ADR-0006).
