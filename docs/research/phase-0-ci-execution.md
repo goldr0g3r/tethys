@@ -145,8 +145,6 @@ The `--admin` override is no longer available; subsequent PRs must pass all gate
 
 ## Implementation Reference
 
-<!-- status-sync step appends the merged PR URL here once the PR is merged. -->
-
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
-- Bootstrap window closed: *to be filled when enforce_admins re-enabled post-merge*
+- PR: [#11 ci: 11 workflows + templates + rule-mirror + dep-graph render + enforce_admins re-enable](https://github.com/goldr0g3r/tethys/pull/11)
+- Merged on: 2026-05-14 (PR #11)
+- Bootstrap window closed: 2026-05-14 - `enforce_admins=true` restored on `main` immediately after PR #11 merge via `gh api -X POST /repos/.../branches/main/protection/enforce_admins`; this status-sync PR (PR #12) is the first PR exercising the full gate organically (no `--admin` override).
