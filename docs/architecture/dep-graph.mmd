@@ -1,0 +1,103 @@
+flowchart LR
+    subgraph master ["tethys-master (Python)"]
+        m_cli[CLI: click]
+        m_gui[GUI: PySide6 + pyqtgraph]
+        m_proto[pyxcp - LGPLv3]
+        m_a2l[Sauci/pya2l - BSD-3]
+        m_mdf[asammdf]
+        m_log[structlog]
+        m_cfg[pydantic-settings]
+        m_cli --> m_proto
+        m_gui --> m_proto
+        m_proto --> m_a2l
+        m_proto --> m_mdf
+        m_proto --> m_log
+        m_proto --> m_cfg
+    end
+
+    subgraph slave ["tethys-slave (C11)"]
+        s_core["tethys_core<br/>(dispatcher + DAQ + STIM + CAL + CRC + seed-and-key)"]
+        s_tal["tethys_transport<br/>(per-transport drivers)"]
+        s_hal["tethys_platform<br/>(STM32 / posix / bare-metal HAL)"]
+        s_prof["tethys_profile.h<br/>(marine | space compile-time)"]
+        s_core --> s_tal
+        s_core --> s_prof
+        s_tal --> s_hal
+    end
+
+    subgraph tooling ["Toolchain (license-free per ADR-0008)"]
+        t_uv[uv]
+        t_cmake[CMake + Ninja]
+        t_gcc[GCC / Clang / arm-none-eabi-gcc]
+        t_cppcheck[cppcheck + MISRA addon]
+        t_clangtidy[clang-tidy]
+        t_gcovr[gcovr / lcov]
+        t_ceedling[Unity + Ceedling]
+        t_libfuzz[libFuzzer]
+        t_aflpp[AFL++]
+        t_pytest[pytest + pytest-qt]
+        t_ruff[ruff + mypy]
+        t_sphinx[Sphinx + Breathe + Doxygen]
+        t_cyclone[CycloneDX SBOM]
+    end
+
+    subgraph standards ["Standards (consumed)"]
+        std_xcp[ASAM XCP 1.4 - S1]
+        std_a2l[ASAM MCD-2 MC A2L - S31]
+        std_misra[MISRA C:2023]
+        std_61508[IEC 61508]
+        std_61784[IEC 61784-3 - S8]
+        std_iso26262[ISO 26262:2018 - S9]
+        std_ecss40[ECSS-E-ST-40C Rev.1 - S18]
+        std_iacs22[IACS UR E22 Rev.3 - S11/S12]
+        std_ccsds[CCSDS 132 / 232 / COP-1 - S10/S14/S32]
+        std_fips197[NIST FIPS-197 AES - ADR-0006]
+        std_can[ISO 11898-1:2024 CAN/CAN-FD - S29]
+        std_61162[IEC 61162-450 marine UDP - S13]
+        std_do178c[DO-178C - S22]
+        std_npr[NPR 7150.2D - S20]
+    end
+
+    subgraph adrs ["Architecture Decision Records"]
+        a1[ADR-0001 dev-time]
+        a2[ADR-0002 profile-based]
+        a3[ADR-0003 MISRA gate]
+        a4[ADR-0004 transport]
+        a5[ADR-0005 no-dyn-alloc]
+        a6[ADR-0006 AES-128]
+        a7[ADR-0007 Python master]
+        a8[ADR-0008 license-free]
+        a10[ADR-0010 loss budget]
+    end
+
+    m_proto -.->|implements| std_xcp
+    m_a2l -.->|parses| std_a2l
+    s_core -.->|implements| std_xcp
+    s_core -.->|MISRA| std_misra
+    s_prof -.->|marine| std_iacs22
+    s_prof -.->|marine UDP| std_61162
+    s_prof -.->|space| std_ecss40
+    s_prof -.->|space TM/TC| std_ccsds
+    s_core -.->|auth| std_fips197
+    s_tal -.->|CAN-FD| std_can
+    s_core -.->|residual| std_61508
+    s_core -.->|residual| std_61784
+    s_core -.->|reference| std_iso26262
+    s_core -.->|reference| std_do178c
+    s_prof -.->|process| std_npr
+
+    master -.->|cited by| a7
+    slave -.->|cited by| a1
+    slave -.->|cited by| a4
+    slave -.->|cited by| a5
+    s_prof -.->|cited by| a2
+    s_core -.->|cited by| a6
+    s_tal -.->|cited by| a4
+    tooling -.->|cited by| a3
+    tooling -.->|cited by| a8
+    t_uv -.->|manages| master
+    t_cmake -.->|builds| slave
+    t_cppcheck -.->|gates| slave
+    t_ceedling -.->|tests| slave
+    t_pytest -.->|tests| master
+    standards -.->|envelope| a10
