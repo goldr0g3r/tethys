@@ -130,5 +130,5 @@ Provisional future ADR:
 
 <!-- status-sync step (sub-plan todo `status-sync`) appends the merged PR URL here once PR-0a is merged. -->
 
-- PR: _to be filled at merge_
-- Merged on: _to be filled at merge_
+- PR: *to be filled at merge*
+- Merged on: *to be filled at merge*

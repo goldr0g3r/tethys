@@ -23,6 +23,9 @@ todos:
   - id: p0-github-setup-runbook
     content: "Phase 0 / PR-0a docs(runbook): docs/runbooks/github-setup.md — PAT scope spec, repo visibility (public), branch protection rules, Rulesets, CODEOWNERS, Projects v2 board creation with 4 custom fields (Phase / Workstream / Layer / Type), auto-add workflow, milestones bootstrap, label set bootstrap. Pre-requisite for p0-issues."
     status: pending
+  - id: p0-system-requirements-research
+    content: "Phase 0 / PR-0c docs(research): docs/research/phase-0-system-requirements.md — multi-standard requirements analysis + packet-loss tolerance budgets per (profile × transport × direction × XCP service). Companion phase-0-standards-matrix.{csv,md} listing ~35 standards (incl. ISO 26262, IEC 61508, IEC 61784-3, CCSDS COP-1, IACS UR E22 Rev.3, ECSS-E-ST-40C Rev.1, DO-178C, AUTOSAR PRS E2E). ADR drafts for ADR-0001/0004/0005 + new ADR-0010 (packet-loss tolerance budget) seeded into docs/adr/drafts/, formalised by PR-3. Resolves the packet-loss tolerance open question parked for downstream phases."
+    status: pending
   - id: p0-issues
     content: "Phase 0 / parallel: 12 milestones (Phase 0..Phase 11) via gh api + full label set (10 type/* + 12 phase/* + 4 prio/* + 8 area/* {master, slave, profile-marine, profile-space, transport, ci, docs, standards} + 8 special) + Phase-0 Research-Note + Epic + Phase-Acceptance issues via GitHub MCP. CODEOWNERS + branch-protection.json applied via gh api .../branches/main/protection."
     status: pending
@@ -445,6 +448,7 @@ The scorecard is the headline of the README. A reviewer can answer "is this a se
 
 ## 13. Open questions (parked for the relevant phase research note)
 
+- **P3/P5/P8 — RESOLVED in PR-0c**: Packet-loss tolerance budget per (profile × transport × direction × XCP service). Resolved by [ADR-0010 draft](docs/adr/drafts/adr-0010-packet-loss-tolerance-budget.md) (proposed in PR-0c, formalised by PR-3). Full derivation + standards anchoring in [`docs/research/phase-0-system-requirements.md`](docs/research/phase-0-system-requirements.md) §6. SIL 2 lower-band residual envelope (≤ 1e-9/h), per-transport rows for UDP / TCP / CAN-FD / SocketCAN / UART-SxI-with-COP-1 / 1-wire FT CAN / loopback.
 - **P2/P8**: Seed-and-key scheme final choice — `none`, custom 4-byte, or AES-128 derived. Plan currently assumes AES-128 for space profile, 4-byte optional for marine.
 - **P4**: XCP PGM (flash programming) support — in scope or out? PGM roughly doubles slave footprint and adds a bootloader spec. Plan currently parks it as out-of-scope; reconsider at P10.
 - **P7/P8**: Hardware procurement — STM32 Nucleo boards (~$25–40 each) are baseline; if access to a GR716A / RAD750 evaluation kit is possible the space profile gains significant credibility.

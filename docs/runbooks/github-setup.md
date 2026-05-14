@@ -876,7 +876,7 @@ Every section of this runbook traces back to one or more sections of the parent 
 | §1 Prerequisites | §5 Toolchain | — |
 | §2 PAT | §6.1 Repository discipline | — |
 | §3 Repo creation | §6.1 | ADR-0008 (license) |
-| §4 Branch protection | §6.1, §6.7 | _ADR-0009 (Rulesets migration, deferred)_ |
+| §4 Branch protection | §6.1, §6.7 | *ADR-0009 (Rulesets migration, deferred)* |
 | §5 CODEOWNERS | §6.1, §6.2 | — |
 | §6 Projects v2 | §6.6 | — |
 | §7 Custom fields | §6.6 | — |
