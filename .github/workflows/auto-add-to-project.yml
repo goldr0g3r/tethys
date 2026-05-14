@@ -1,0 +1,28 @@
+name: auto-add-to-project
+
+# Adds every new Issue and Pull Request to the "Tethys Roadmap" Projects v2 board.
+# Setup required before this workflow does anything useful:
+#   1. Run docs/runbooks/github-setup.md §6 to create the project and capture its number.
+#   2. Replace the two <REPLACE-...> tokens in `project-url` below with the real values.
+#   3. Run docs/runbooks/github-setup.md §8.1 to set the ADD_TO_PROJECT_PAT secret.
+# Until step 2 is done the workflow is a no-op (it will fail to find the project and skip).
+
+on:
+  issues:
+    types: [opened, reopened, transferred]
+  pull_request_target:
+    types: [opened, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  add-to-project:
+    name: Add to Tethys Roadmap
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add new item to project
+        uses: actions/add-to-project@244f685bbc3b7adfa8466e08b698b5577571133e # v1.0.2
+        with:
+          project-url: https://github.com/users/<REPLACE-OWNER>/projects/<REPLACE-NUMBER>
+          github-token: ${{ secrets.ADD_TO_PROJECT_PAT }}
