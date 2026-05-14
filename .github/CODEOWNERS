@@ -1,0 +1,38 @@
+# CODEOWNERS - Tethys
+# Syntax: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Source: docs/runbooks/github-setup.md section 5
+# Applied by: PR p0-issues (chore/p0-issues)
+
+# Default - every path requires owner approval unless overridden below.
+*                       @goldr0g3r
+
+# Slave (embedded C library)
+/slave/                 @goldr0g3r
+/slave/include/         @goldr0g3r
+/slave/src/core/        @goldr0g3r
+/slave/src/transport/   @goldr0g3r
+/slave/src/platform/    @goldr0g3r
+/slave/profiles/        @goldr0g3r
+/slave/tests/           @goldr0g3r
+/slave/fuzz/            @goldr0g3r
+
+# Master (Python PC tool)
+/master/                @goldr0g3r
+
+# Simulator + HIL
+/simulator/             @goldr0g3r
+/hil/                   @goldr0g3r
+
+# Documentation
+/docs/                  @goldr0g3r
+/docs/adr/              @goldr0g3r
+/docs/runbooks/         @goldr0g3r
+/docs/traceability.csv  @goldr0g3r
+/docs/misra-deviations.md @goldr0g3r
+
+# CI + repo plumbing
+/.github/               @goldr0g3r
+/.cursor/               @goldr0g3r
+/cmake/                 @goldr0g3r
+/infrastructure/        @goldr0g3r
