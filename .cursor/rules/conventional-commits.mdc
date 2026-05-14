@@ -1,0 +1,56 @@
+---
+description: Conventional Commits 1.0; explicit type + scope list; enforced by PR-4 pr-title.yml workflow
+alwaysApply: true
+---
+
+# Conventional Commits
+
+Every commit subject line follows [Conventional Commits 1.0](https://www.conventionalcommits.org/en/v1.0.0/). PR titles match the commit subject (squash-merge preserves the PR title as the merged commit subject).
+
+## Format
+
+```text
+<type>(<scope>): <imperative-mood subject, lowercase, no period>
+
+<body paragraph(s) explaining the why>
+
+Cite: <standard citation, see always-cite-standards rule>
+Trace: <docs/traceability.csv row id>
+Closes: #<issue>
+```
+
+## Allowed types
+
+| type | use for |
+| --- | --- |
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `chore` | Maintenance / housekeeping |
+| `docs` | Documentation only |
+| `ci` | CI / build pipeline |
+| `refactor` | Behaviour-preserving refactor |
+| `test` | Tests added or changed |
+| `perf` | Performance improvement |
+| `build` | Build system / toolchain |
+| `revert` | Revert a prior commit |
+
+## Allowed scopes
+
+`master`, `slave`, `transport`, `profile-marine`, `profile-space`, `docs`, `ci`, `standards`, `scaffold`, `rules`, `issues`, `runbook`, `research`, `status-sync`, `release`.
+
+Match the `area/*` labels (parent plan §6.6). New scopes require a single-line update to this rule + the matching label.
+
+## Examples
+
+```text
+feat(slave): implement CONNECT command per XCP 1.4 §1.3.2.4
+fix(master): correct CTR wrap-around in DAQ_GAP detection
+chore(rules): cursor rule set + agent mirrors + parent-plan status-sync
+docs(research): system requirements + packet-loss tolerance budget
+ci(misra-gate): add cppcheck addon=misra runner
+test(slave/transport): conformance suite row 1-7 (loss + reorder)
+```
+
+## CI enforcement (lands in PR-4)
+
+`pr-title.yml` workflow runs [`amannn/action-semantic-pull-request`](https://github.com/amannn/action-semantic-pull-request) (pinned to commit SHA per `version-pinning` rule) configured with the type + scope lists above. PR title regression blocks merge.

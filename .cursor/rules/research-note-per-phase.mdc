@@ -1,0 +1,45 @@
+---
+description: Every phase PR ships with a research note at docs/research/phase-N-topic.md with retrieval-dated sources at most 14 days old
+alwaysApply: true
+---
+
+# Research note per phase
+
+Every phase PR (Phase 0..11) lands a research note under `docs/research/phase-<N>-<topic>.md`. This is the per-PR evidence trail the parent plan §6.4 mandates. The pattern is set by [`phase-0-github-setup.md`](../../docs/research/phase-0-github-setup.md), [`phase-0-system-requirements.md`](../../docs/research/phase-0-system-requirements.md), [`phase-0-issues-execution.md`](../../docs/research/phase-0-issues-execution.md), and [`phase-1-scaffold-execution.md`](../../docs/research/phase-1-scaffold-execution.md).
+
+## Required sections
+
+```markdown
+# Phase N - <topic> (research note)
+
+> Research note backing the <PR id> PR.
+> Parent plan: ...
+> Sub-plan: ...
+
+## Scope
+## Sources (retrieved YYYY-MM-DD)
+## Decisions
+## Open follow-ups
+## Implementation Reference
+
+- PR: *to be filled at merge*
+- Merged on: *to be filled at merge*
+```
+
+## Source freshness rule
+
+Every cited source must have a retrieval date in its citation block. The retrieval date must be **at most 14 days old at PR open time** for any source that may change between releases (vendor docs, GitHub READMEs, web articles). Standards documents (IEC, ECSS, NPR, DO, IACS, ASAM, ISO) are exempt from the 14-day rule but must cite the edition/revision.
+
+## When the rule fires
+
+- Any PR with a parent-plan `phase/*` label.
+- Any PR that introduces a new file under `docs/adr/` or `docs/research/`.
+
+## When the rule does NOT fire
+
+- Pure status-sync PRs (e.g. PR #6) that only flip todo flags - they ride on the prior PR's research note.
+- Trivial refactor PRs that don't change behaviour and don't touch traced code.
+
+## CI enforcement (lands in PR-4)
+
+`pr-title.yml` checks PR labels: if `phase/*` is set, the diff must include a new or modified file under `docs/research/`. Failure blocks merge.
