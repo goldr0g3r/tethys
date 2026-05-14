@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: p0-ci
     content: "Phase 0 / PR-4 ci: .github/workflows — ci.yml (build + unit + integration matrix: ubuntu/windows/macos × master, ubuntu × slave/posix-sim, arm-none-eabi × slave/stm32), misra-gate.yml (cppcheck --addon=misra, zero-deviation gate), static-analysis.yml (clang-tidy + gcc -fanalyzer + scan-build), coverage.yml (gcovr ≥95% statement, ≥90% MC/DC on protocol core), fuzz-nightly.yml (libFuzzer corpus growth tracked), a2l-roundtrip.yml (drift gate), pr-title.yml (conventional commits), secret-scan.yml, dependency-review.yml, sbom.yml (CycloneDX on tags), release.yml (semantic-release, GitHub Release with artefacts). + issue/PR templates + CODEOWNERS + branch-protection.json."
-    status: pending
+    status: completed
   - id: p0-coding-standards
     content: "Phase 0 / PR-5 chore(quality): .clang-format (LLVM base, 120 col), .clang-tidy (cert-*, bugprone-*, performance-*, readability-*), .editorconfig, cppcheck.cfg with MISRA addon ruleset, .gitattributes (LF normalisation), pre-commit hooks (clang-format, ruff, yamllint, markdownlint, codespell), docs/coding-standard.md (naming, header guards, banned constructs, MISRA deviation procedure)."
     status: pending

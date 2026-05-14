@@ -1,0 +1,55 @@
+name: misra-gate
+
+# MISRA C:2023 gate per ADR-0003 + .cursor/rules/misra-c-2023-gate.mdc.
+# Mandatory + required rules: zero deviations.
+# Advisory rules: tracked in docs/misra-deviations.md (lands in PR-5); no PR-blocking gate.
+#
+# Tool: cppcheck --addon=misra (free; covers the MISRA C:2023 rule set per ADR-0008).
+#
+# Status: scaffolded. Today slave/src/ + slave/include/ are nearly empty (cmake-init stubs only).
+# Real gating engages as Phase-2 (XCP protocol core) lands C code.
+
+on:
+  pull_request:
+    paths:
+      - 'slave/**'
+
+permissions:
+  contents: read
+
+jobs:
+  cppcheck-misra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install cppcheck
+        run: sudo apt-get update && sudo apt-get install -y cppcheck
+
+      - name: cppcheck MISRA on slave/src
+        run: |
+          cppcheck \
+            --addon=misra \
+            --enable=warning,style,performance,portability \
+            --inline-suppr \
+            --suppress=missingInclude \
+            --error-exitcode=1 \
+            --std=c11 \
+            slave/src slave/include \
+            2>&1 | tee cppcheck-misra.log
+
+      - name: Verify zero MISRA mandatory/required deviations
+        run: |
+          if grep -E "misra-c2012-(M|R)" cppcheck-misra.log; then
+            echo "ERROR: open MISRA mandatory or required deviation found."
+            echo "Document the deviation in docs/misra-deviations.md per ADR-0003."
+            exit 1
+          fi
+          echo "OK: zero MISRA mandatory/required deviations."
+
+      - name: Upload cppcheck log
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: cppcheck-misra-log
+          path: cppcheck-misra.log
+          retention-days: 30

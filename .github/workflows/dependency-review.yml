@@ -1,0 +1,47 @@
+name: dependency-review
+
+# Dependency review per parent plan section 6.7.
+# GitHub Dependency Review API flags new dependencies; allowed-licences list enforces
+# the free-tool-only rule (ADR-0008 + .cursor/rules/free-tool-only.mdc).
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/dependency-review-action@3b139cfc5fae8b618d3eae3675e383bb1769c019 # v4.5.0
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure
+          allow-licenses: >-
+            MIT,
+            Apache-2.0,
+            BSD-2-Clause,
+            BSD-3-Clause,
+            ISC,
+            LGPL-2.1,
+            LGPL-2.1-only,
+            LGPL-2.1-or-later,
+            LGPL-3.0,
+            LGPL-3.0-only,
+            LGPL-3.0-or-later,
+            MPL-2.0,
+            GPL-2.0,
+            GPL-2.0-only,
+            GPL-2.0-or-later,
+            GPL-3.0,
+            GPL-3.0-only,
+            GPL-3.0-or-later,
+            Unlicense,
+            CC0-1.0,
+            Zlib,
+            BlueOak-1.0.0,
+            Python-2.0,
+            PSF-2.0

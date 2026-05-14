@@ -1,0 +1,53 @@
+name: pr-title
+
+# Conventional Commits 1.0 enforcement per .cursor/rules/conventional-commits.mdc.
+# Validates PR title against the type + scope lists from the rule.
+# PR title becomes the squashed commit subject on merge (parent section 6.1).
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          types: |
+            feat
+            fix
+            chore
+            docs
+            ci
+            refactor
+            test
+            perf
+            build
+            revert
+          scopes: |
+            master
+            slave
+            transport
+            profile-marine
+            profile-space
+            docs
+            ci
+            standards
+            scaffold
+            rules
+            issues
+            runbook
+            research
+            status-sync
+            release
+            branch-protection
+          requireScope: false
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the pull request title "{title}" should start with a lowercase character.
