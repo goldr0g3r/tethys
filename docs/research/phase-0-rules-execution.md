@@ -94,7 +94,6 @@ Two parent-plan todos were still marked `pending` despite their deliverables hav
 
 ## Implementation Reference
 
-<!-- status-sync step appends the merged PR URL here once the PR is merged. -->
-
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#7 chore(rules): cursor rule set + agent mirrors + parent-plan status-sync](https://github.com/goldr0g3r/tethys/pull/7)
+- Merged on: 2026-05-14 11:22:54 UTC
+- Bootstrap window: same as PR #4 / #5 (`enforce_admins` off; PR-4 re-enables when status checks land).
