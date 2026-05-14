@@ -1,4 +1,4 @@
-# Phase 0 - CI execution (research note)
+﻿# Phase 0 - CI execution (research note)
 
 > Research note backing the `p0-ci` PR (`ci: 11 workflows + templates + rule-mirror + dep-graph render + enforce_admins re-enable`).
 > Parent plan: [`.cursor/plans/xcp_extreme-env_tool_14019278.plan.md`](../../.cursor/plans/xcp_extreme-env_tool_14019278.plan.md) - todo `p0-ci` (PR-4).
@@ -27,17 +27,17 @@ This note captures the workflow inventory, action SHA pin procedure, scaffold-vs
 
 | # | File | Trigger | Status | Resolves |
 | - | --- | --- | --- | --- |
-| 1 | `ci.yml` | push + PR | scaffolded (matrix runs trivially; engages at Phase-1+) | parent §6.7 |
-| 2 | `misra-gate.yml` | PR on `slave/**` | scaffolded (empty C tree; engages at Phase-2) | parent §6.7 + ADR-0003 |
-| 3 | `static-analysis.yml` | push + PR | scaffolded; zero new warnings rule engages with code | parent §6.7 |
-| 4 | `coverage.yml` | push + PR + nightly | scaffolded; `--print-summary` only today; thresholds engage at PR-2+ | parent §6.7 + ADR-0010 |
-| 5 | `fuzz-nightly.yml` | nightly cron + manual | scaffolded; harness lands in Phase-2 | parent §6.7 + ADR-0010 |
-| 6 | `a2l-roundtrip.yml` | PR on A2L paths | scaffolded; fixtures land in Phase-1 | parent §6.7 |
+| 1 | `ci.yml` | push + PR | scaffolded (matrix runs trivially; engages at Phase-1+) | parent Â§6.7 |
+| 2 | `misra-gate.yml` | PR on `slave/**` | scaffolded (empty C tree; engages at Phase-2) | parent Â§6.7 + ADR-0003 |
+| 3 | `static-analysis.yml` | push + PR | scaffolded; zero new warnings rule engages with code | parent Â§6.7 |
+| 4 | `coverage.yml` | push + PR + nightly | scaffolded; `--print-summary` only today; thresholds engage at PR-2+ | parent Â§6.7 + ADR-0010 |
+| 5 | `fuzz-nightly.yml` | nightly cron + manual | scaffolded; harness lands in Phase-2 | parent Â§6.7 + ADR-0010 |
+| 6 | `a2l-roundtrip.yml` | PR on A2L paths | scaffolded; fixtures land in Phase-1 | parent Â§6.7 |
 | 7 | `pr-title.yml` | PR | **engaged today** | rule `conventional-commits` |
-| 8 | `secret-scan.yml` | push + PR | **engaged today** | parent §6.7 |
-| 9 | `dependency-review.yml` | PR | **engaged today** | parent §6.7 + rule `free-tool-only` |
-| 10 | `sbom.yml` | tag `v*` | scaffolded; first release at v0.1.0 | parent §6.7 + ADR-0008 |
-| 11 | `release.yml` | tag `v*` | scaffolded; full content at PR-11 | parent §6.7 + section 11 |
+| 8 | `secret-scan.yml` | push + PR | **engaged today** | parent Â§6.7 |
+| 9 | `dependency-review.yml` | PR | **engaged today** | parent Â§6.7 + rule `free-tool-only` |
+| 10 | `sbom.yml` | tag `v*` | scaffolded; first release at v0.1.0 | parent Â§6.7 + ADR-0008 |
+| 11 | `release.yml` | tag `v*` | scaffolded; full content at PR-11 | parent Â§6.7 + section 11 |
 | 12 | `docs-render.yml` | PR/push touching `dep-graph.mmd` | **engaged today** | **PR-3 F1** |
 | 13 | `rules-mirror-drift.yml` | PR touching rule paths | **engaged today** | **PR-7 F2** |
 
@@ -85,7 +85,7 @@ The three originally-shipped templates (`research-note.md`, `epic.md`, `phase-ac
 `infrastructure/rules/sync.{sh,ps1}` + `_convert.py`:
 
 - `sync.sh` (bash) / `sync.ps1` (PowerShell) - thin wrappers that iterate `.cursor/rules/*.mdc` and call the Python helper.
-- `_convert.py` - parses frontmatter; translates `globs:` → `applyTo:` (or `applyTo: '**'` if `alwaysApply: true`); prepends a "Mirror of" header; writes `.github/instructions/<name>.instructions.md`.
+- `_convert.py` - parses frontmatter; translates `globs:` â†’ `applyTo:` (or `applyTo: '**'` if `alwaysApply: true`); prepends a "Mirror of" header; writes `.github/instructions/<name>.instructions.md`.
 - Idempotent; running twice produces the same output.
 - The CI workflow `rules-mirror-drift.yml` runs `sync.sh` on every PR touching rule paths and fails on diff. Resolves PR-7 F2.
 
@@ -113,7 +113,7 @@ Verifies via:
 
 ```bash
 gh api "/repos/goldr0g3r/tethys/branches/main/protection" --jq '.enforce_admins.enabled'
-# → true
+# â†’ true
 ```
 
 Future PRs go through:
@@ -130,7 +130,7 @@ The `--admin` override is no longer available; subsequent PRs must pass all gate
 
 | Q | Resolution |
 | - | - |
-| Q1 PR scope | all 13 workflows + templates + scripts in one PR per parent §7 |
+| Q1 PR scope | all 13 workflows + templates + scripts in one PR per parent Â§7 |
 | Q2 enforce_admins re-enable | as final step inside PR-4 after merge |
 | Q3 Dependabot vs Renovate | ship both; Dependabot is the GitHub-native baseline |
 | Q4 Missing-feature stubs | scaffold workflows trivially today; engage when code arrives |
@@ -145,8 +145,6 @@ The `--admin` override is no longer available; subsequent PRs must pass all gate
 
 ## Implementation Reference
 
-<!-- status-sync step appends the merged PR URL here once the PR is merged. -->
-
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
-- Bootstrap window closed: *to be filled when enforce_admins re-enabled post-merge*
+- PR: [#11 ci: 11 workflows + templates + rule-mirror + dep-graph render + enforce_admins re-enable](https://github.com/goldr0g3r/tethys/pull/11)
+- Merged on: 2026-05-14 (PR #11)
+- Bootstrap window closed: 2026-05-14 - `enforce_admins=true` restored on `main` immediately after PR #11 merge via `gh api -X POST /repos/.../branches/main/protection/enforce_admins`; this status-sync PR (PR #12) is the first PR exercising the full gate organically (no `--admin` override).
