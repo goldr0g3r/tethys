@@ -1,0 +1,34 @@
+# Root .gitignore - root-level cross-cutting ignores only.
+# Per-component ignores live in their own .gitignore files (e.g. slave/.gitignore from cmake-init).
+
+# Python (master + simulator)
+.venv/
+.uv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+
+# C/C++ build outputs
+build/
+*.o
+*.a
+*.obj
+*.exe
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Ceedling (lands in PR-1a)
+.ceedling/
+
+# Local commit-message temp files (used by CI/agent workflows; never committed)
+COMMIT_MSG.tmp
+PR_BODY.tmp
+.git/TETHYS_COMMIT_MSG
+.git/TETHYS_PR_BODY

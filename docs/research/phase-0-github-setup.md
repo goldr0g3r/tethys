@@ -128,7 +128,6 @@ Provisional future ADR:
 
 ## Implementation Reference
 
-<!-- status-sync step (sub-plan todo `status-sync`) appends the merged PR URL here once PR-0a is merged. -->
-
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR-0a docs(runbook): merged as commit `9e6dc65` (manually committed by repo owner alongside PR-0c).
+- PR-0c docs(research): merged as commit `9e6dc65` (same commit as PR-0a).
+- PR executing this runbook for the first time: [#4 chore(issues): apply Phase-0 GitHub surface](https://github.com/goldr0g3r/tethys/pull/4), merged 2026-05-14.
