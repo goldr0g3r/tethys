@@ -1,0 +1,118 @@
+# ADR-0005 - No dynamic allocation in the slave
+
+- **Status:** accepted
+- **Date:** 2026-05-14
+- **Deciders:** @goldr0g3r (project owner)
+- **Consulted:** (solo decision; backed by [`docs/research/phase-0-system-requirements.md`](../research/phase-0-system-requirements.md) §6 + §10)
+- **Informed:** future slave implementers; Phase-3/4/7/8 buffer designers
+- **Supersedes:** —
+- **Superseded by:** —
+- **Accepted by:** PR-3 `docs(architecture)` (elevated from the draft seeded in PR-0c)
+
+## Context and Problem Statement
+
+Both ECSS-E-ST-40C Rev.1 (S18 in [`phase-0-standards-matrix.csv`](../research/phase-0-standards-matrix.csv)) and MISRA C:2023 advisory rule sets ban dynamic memory allocation in safety-related embedded code. The [`no-dynamic-allocation.mdc`](../../.cursor/rules/no-dynamic-allocation.mdc) Cursor rule (PR-2) makes this machine-checkable.
+
+But banning `malloc` / `calloc` / `realloc` / `free` is only useful if the static buffer sizes are **correct**: too small and the slave drops legitimate traffic; too big and the slave wastes RAM on a microcontroller with 192 KB SRAM (STM32F4) to 1 MB (STM32H7). The problem: how does Tethys derive static buffer sizes that are simultaneously deterministic, profile-correct, and traceable to the packet-loss budget in [ADR-0010](0010-packet-loss-tolerance-budget.md)?
+
+## Decision Drivers
+
+- ECSS-E-ST-40C Rev.1 + MISRA C:2023 advisory: no dynamic allocation in slave/.
+- ISO 26262:2018 part 6 (S9) requires deterministic memory layout for ASIL B+.
+- Slave runs on STM32F4 (192 KB SRAM) at the small end - every byte matters.
+- Buffer sizes must trace to the packet-loss budget rows in [ADR-0010](0010-packet-loss-tolerance-budget.md); without traceability the no-allocation rule is enforceable but the sizes are arbitrary.
+
+## Considered Options
+
+1. **Allow a small heap (e.g. `pico_malloc`).** Permit bounded dynamic allocation with a fixed-size heap region.
+2. **Worst-case-once buffer for everything (single maximum across all profiles).** Simple sizing rule: every buffer = the largest possible across all configurations.
+3. **Static allocation per-profile, sized from the packet-loss budget table.** Generate a profile-specific `tethys_static_memory.h` from the A2L `MAX_DTO` + transport `transport_max_burst_loss` ([ADR-0004](0004-transport-abstraction-layer.md)) at CMake time.
+
+## Decision Outcome
+
+Chose **Option 3**: all slave-side buffers are statically allocated at compile time, sized per the worst-case row of [ADR-0010](0010-packet-loss-tolerance-budget.md) that applies to the active profile.
+
+### ODT receive buffer
+
+The ODT (Object Descriptor Table) receive buffer holds DTOs until the master pulls them. Sizing:
+
+```text
+odt_buffer_size = ceil(transport_max_burst_loss x odt_packet_size x safety_margin)
+```
+
+where:
+
+- `transport_max_burst_loss` comes from [ADR-0004](0004-transport-abstraction-layer.md) metadata API per transport.
+- `odt_packet_size` is the worst-case ODT size, bounded by `MAX_DTO` per A2L.
+- `safety_margin` = 2.0 (allows one full burst plus next-burst overlap).
+
+Worked example (marine / UDP):
+
+- `transport_max_burst_loss` = 100 packets (per `phase-0-system-requirements.md` §6.2 marine DAQ blackout bound).
+- `odt_packet_size` = 64 B typical, 1452 B max (UDP/IP/IEC-61162-450 envelope).
+- `safety_margin` = 2.0.
+- `odt_buffer_size` = `ceil(100 x 64 x 2.0)` = 12 800 B for the typical case; `ceil(100 x 1452 x 2.0)` = 290 400 B for the worst case. The marine slave compiles in the worst-case figure for the configured DAQ list count.
+
+Worked example (space / UART-SxI + COP-1 AD):
+
+- `transport_max_burst_loss` = 16 packets (COP-1 FARM-1 sliding window typical size).
+- `odt_packet_size` = 64 B typical, 220 B max (COP-1 TC frame payload typical).
+- `safety_margin` = 2.0.
+- `odt_buffer_size` = `ceil(16 x 64 x 2.0)` = 2 048 B typical; `ceil(16 x 220 x 2.0)` = 7 040 B worst case.
+
+### CTO buffer
+
+CTO commands are bounded by `MAX_CTO`:
+
+```text
+cto_rx_buffer_size = MAX_CTO       /* one in-flight CTO at a time */
+cto_tx_buffer_size = MAX_CTO x 2   /* response buffer + retry slot */
+```
+
+### CAL page buffer
+
+CAL pages are bounded at compile time by the A2L `CHARACTERISTIC` set:
+
+```text
+cal_page_size = sum_of(sizeof(CHARACTERISTIC) for CHARACTERISTIC in A2L)
+cal_active_pages = 2     /* working + active */
+cal_mirror_pages = 1     /* flash mirror */
+cal_total_ram = cal_page_size x cal_active_pages
+```
+
+With EDAC overhead in the space profile (8 bits parity per 64 data bits = 12.5%):
+
+```text
+cal_total_ram_space = cal_total_ram x 1.125
+```
+
+### Static memory map header
+
+A generated header `tethys_static_memory.h` carries the computed sizes:
+
+```c
+#define TETHYS_ODT_BUFFER_SIZE   12800u   /* marine/udp/typical */
+#define TETHYS_CTO_RX_SIZE       64u
+#define TETHYS_CTO_TX_SIZE       128u
+#define TETHYS_CAL_PAGE_SIZE     16384u
+#define TETHYS_CAL_TOTAL_RAM     32768u
+```
+
+The header is regenerated by the CMake `tethys_size_calc` target whenever the A2L or the active profile changes.
+
+## Consequences
+
+- **Positive:** Slave RAM footprint is deterministic at compile time - no surprises at runtime.
+- **Positive:** The [`no-dynamic-allocation.mdc`](../../.cursor/rules/no-dynamic-allocation.mdc) Cursor rule + cppcheck-misra check enforce zero `malloc` / `calloc` / `realloc` / `free` in `slave/` source. CI fails on any occurrence.
+- **Negative:** A2L bloat (more CHARACTERISTICs) directly grows compile-time RAM use; the build fails if the computed total exceeds the configured MCU SRAM minus a 25% headroom for stack + .bss. Catches RAM exhaustion at build time rather than at flight time, but does require the A2L author to be RAM-aware.
+- **Negative:** Buffer sizing is **profile-coupled** - the same source compiled for marine vs space produces different `tethys_static_memory.h` values. Acceptable because the profile is fixed at build time per [ADR-0002](0002-profile-based-build-system.md).
+- **Risk:** Worst-case `transport_max_burst_loss` numbers from [ADR-0010](0010-packet-loss-tolerance-budget.md) may prove conservative in practice, wasting RAM. **Mitigation:** Phase 3 + Phase 5 empirical measurement revises [ADR-0010](0010-packet-loss-tolerance-budget.md) (and therefore this ADR's inputs) via superseding ADRs.
+
+## References
+
+- [`docs/research/phase-0-system-requirements.md`](../research/phase-0-system-requirements.md) §6, §6.2, §8.3, §10.
+- [ADR-0002](0002-profile-based-build-system.md) - compile-time profile selection makes this sizing approach feasible.
+- [ADR-0004](0004-transport-abstraction-layer.md) - provides `transport_max_burst_loss`.
+- [ADR-0010](0010-packet-loss-tolerance-budget.md) - provides the budget rows.
+- Parent plan section 3.2 "No dynamic allocation".
+- [`no-dynamic-allocation.mdc`](../../.cursor/rules/no-dynamic-allocation.mdc) - machine-readable enforcement.
