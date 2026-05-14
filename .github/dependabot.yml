@@ -1,0 +1,54 @@
+version: 2
+
+# Dependabot config per parent plan section 6.7 + ADR-0008.
+# Weekly updates for github-actions + pip; auto-PR opens are reviewed by @goldr0g3r per CODEOWNERS.
+# Pin format must remain commit-SHA per .cursor/rules/version-pinning.mdc.
+
+updates:
+  # GitHub Actions used by workflows
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: scope
+    labels:
+      - type/build
+      - area/ci
+
+  # Python: master
+  - package-ecosystem: pip
+    directory: /master
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build"
+      include: scope
+    labels:
+      - type/build
+      - area/master
+
+  # Python: simulator
+  - package-ecosystem: pip
+    directory: /simulator
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "build"
+      include: scope
+    labels:
+      - type/build
+      - area/master

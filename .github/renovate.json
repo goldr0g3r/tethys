@@ -1,0 +1,42 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":pinAllExceptPeerDependencies"
+  ],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "timezone": "UTC",
+  "labels": ["type/build"],
+  "commitMessagePrefix": "build:",
+  "rangeStrategy": "pin",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on monday"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "pinDigests": true,
+      "labels": ["type/ci", "area/ci"],
+      "commitMessagePrefix": "ci:"
+    },
+    {
+      "matchPaths": ["master/**"],
+      "labels": ["type/build", "area/master"]
+    },
+    {
+      "matchPaths": ["simulator/**"],
+      "labels": ["type/build", "area/master"]
+    },
+    {
+      "matchPaths": ["slave/**"],
+      "labels": ["type/build", "area/slave"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "labels": ["security", "type/build", "prio/p0"]
+  },
+  "_comment": "Renovate is the advanced alternative to Dependabot. Either is sufficient; both are enabled so contributors can use whichever PR they prefer. Per ADR-0008 + .cursor/rules/version-pinning.mdc all pins must remain exact (commit SHA for actions, exact version for libs)."
+}

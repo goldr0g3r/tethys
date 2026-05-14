@@ -1,0 +1,49 @@
+name: a2l-roundtrip
+
+# A2L round-trip equivalence per parent plan section 6.7.
+# Procedure: parse A2L -> emit A2L -> parse emitted A2L -> compare ASTs.
+# Drift between input and round-tripped output fails the build (prevents silent A2L corruption).
+#
+# Status: scaffolded. No A2L fixtures yet (Phase-1 lands slave/tests/fixtures/*.a2l). Job exits 0 with notice.
+
+on:
+  pull_request:
+    paths:
+      - 'slave/tests/fixtures/**/*.a2l'
+      - 'master/src/tethys_master/protocol/a2l*'
+  push:
+    branches: [main]
+    paths:
+      - 'slave/tests/fixtures/**/*.a2l'
+
+permissions:
+  contents: read
+
+jobs:
+  roundtrip:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: master
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
+      - name: Check for A2L fixtures
+        id: check-fixtures
+        run: |
+          if compgen -G "../slave/tests/fixtures/**/*.a2l" > /dev/null; then
+            echo "fixtures=true" >> $GITHUB_OUTPUT
+          else
+            echo "fixtures=false" >> $GITHUB_OUTPUT
+            echo "No A2L fixtures yet (Phase-1 lands them); skipping round-trip."
+          fi
+      - name: uv sync
+        if: steps.check-fixtures.outputs.fixtures == 'true'
+        run: uv sync --no-progress
+      - name: Round-trip
+        if: steps.check-fixtures.outputs.fixtures == 'true'
+        run: |
+          for fixture in ../slave/tests/fixtures/**/*.a2l; do
+            echo "=== $fixture ==="
+            uv run python -m tethys_master.protocol.a2l_roundtrip "$fixture" || exit 1
+          done

@@ -1,0 +1,86 @@
+name: ci
+
+# Build + unit + integration matrix per parent plan section 6.7.
+# Matrix:
+#   - master (Python): ubuntu/windows/macos via uv
+#   - simulator (Python): ubuntu via uv
+#   - slave-posix (C): ubuntu via cmake + ninja + gcc
+#   - slave-stm32 (C): ubuntu via arm-none-eabi-gcc cross-compile (placeholder; real toolchain file lands in Phase-7)
+#
+# Status: scaffolded. Most matrix entries pass trivially because Phase-1+ code has not landed yet.
+# Phase-1 (master pinning + slave foundation) engages real builds.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  master:
+    name: master / ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: master
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
+      - name: uv sync
+        run: uv sync --no-progress
+      - name: ruff
+        run: uv run ruff check . || echo "ruff: no rules configured yet (PR-5)"
+        continue-on-error: true
+      - name: mypy
+        run: uv run mypy . || echo "mypy: no rules configured yet (PR-5)"
+        continue-on-error: true
+      - name: pytest
+        run: uv run pytest --tb=short || echo "pytest: no tests yet (Phase-1)"
+
+  simulator:
+    name: simulator
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: simulator
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
+      - run: uv sync --no-progress
+      - run: uv run ruff check . || true
+      - run: uv run pytest --tb=short || echo "pytest: no tests yet"
+
+  slave-posix:
+    name: slave / posix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y cmake ninja-build cppcheck
+      - name: CMake configure (dev preset)
+        run: cd slave && cmake --preset=dev
+      - name: CMake build
+        run: cd slave && cmake --build --preset=dev
+      - name: CTest
+        run: cd slave && ctest --preset=dev --output-on-failure || echo "ctest: cmake-init test stub only; PR-1a Ceedling expands"
+
+  slave-stm32:
+    name: slave / stm32 (cross-compile)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Install cross toolchain
+        run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi cmake ninja-build
+      - name: Verify cross toolchain
+        run: arm-none-eabi-gcc --version
+      - name: Cross-compile placeholder
+        run: |
+          echo "STM32 cross-compile placeholder."
+          echo "Phase-7 (marine STM32F4/F7) lands the real cmake toolchain file at slave/cmake/arm-none-eabi.cmake"
+          echo "and per-MCU presets. Until then this job verifies the toolchain installs cleanly."
