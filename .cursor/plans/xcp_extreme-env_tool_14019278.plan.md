@@ -4,7 +4,7 @@ overview: "Tethys is a portfolio-grade, license-free, two-part XCP system: a Pyt
 todos:
   - id: p0-scaffold
     content: "Phase 0 / PR-1 chore(scaffold): monorepo bootstrap via CLI only — uv init for master Python package + cmake-init for slave C library + ceedling new for unit tests + simulator app stub. Workspace layout per §16. NO hand-rolled pyproject.toml / CMakeLists.txt edits beyond what the CLIs emit; subsequent PRs add config in small, reviewable increments."
-    status: pending
+    status: completed
   - id: p0-rules
     content: "Phase 0 / PR-2 chore(rules): .cursor/rules/*.mdc — xcp-protocol-discipline, misra-c-2023-gate, ecss-traceability, marine-profile-invariants, space-profile-invariants, no-dynamic-allocation, no-recursion-no-goto, always-cite-standards, research-note-per-phase, version-pinning, free-tool-only, conventional-commits — plus .github/instructions/ mirror, AGENTS.md, CLAUDE.md, copilot-instructions.md. Verifies discipline gates are machine-readable for both Cursor agent and GitHub Copilot reviewers."
     status: pending

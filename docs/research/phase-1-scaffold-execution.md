@@ -140,7 +140,6 @@ cmake-init shipped files that overlap with later PR scope. Per the strict rule w
 
 ## Implementation Reference
 
-<!-- status-sync step appends the merged PR URL here once the PR is merged. -->
-
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#5 chore(scaffold): monorepo bootstrap via CLI](https://github.com/goldr0g3r/tethys/pull/5)
+- Merged on: 2026-05-14 11:10:30 UTC
+- Bootstrapped against `goldr0g3r/tethys` with `enforce_admins` temporarily off (same bootstrap window as PR #4); restoration of `enforce_admins=true` happens at PR-4 once the 9 required status checks exist.
