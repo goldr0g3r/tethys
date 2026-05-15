@@ -69,6 +69,7 @@ target_sources(tethys_slave PRIVATE
     "${CMAKE_CURRENT_SOURCE_DIR}/src/profiles/space/space_init.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/profiles/space/space_workload.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/profiles/space/edac.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/profiles/space/service_mode.c"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/security/aes128_seed_and_key.c"
 )
 
