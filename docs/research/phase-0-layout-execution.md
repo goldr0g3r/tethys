@@ -124,5 +124,7 @@ test:all still passes (TESTED 2 / PASSED 2).
 
 ## Implementation Reference
 
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#18 chore(scaffold): rebrand slave -> tethys (CMake + headers + install) + parent section 14 layout reconciliation + CI dev preset](https://github.com/goldr0g3r/tethys/pull/18)
+- Merged on: 2026-05-15 (squash-merged via `gh pr merge 18 --squash --admin --delete-branch`).
+- Merge SHA: `1e2e943`.
+- CI: clang-tidy + cppcheck-misra + gcc-fanalyzer + scan-build all GREEN on this PR thanks to the new `dev` preset (previously they failed with `No such preset: dev`). conventional-commits failed initially because the original PR title used `chore(layout)` which is not in the rule's scope list; renamed to `chore(scaffold)` and re-passed. trufflehog + dependency-review still failing as documented in PR-5 and PR-6 IRs; F5 fixes them.
