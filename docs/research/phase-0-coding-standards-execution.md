@@ -198,9 +198,20 @@ hook).
 
 ## Implementation Reference
 
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#15 chore(standards): coding-standards baseline](https://github.com/goldr0g3r/tethys/pull/15)
+- Merged on: 2026-05-15 (squash-merged via `gh pr merge 15 --squash --admin --delete-branch`).
+- Merge SHA: `e135434`.
 - Bootstrap window status: closed (PR-11 re-enabled `enforce_admins`). This PR
-  is the first PR-5+ that exercises the loose-but-required branch protection
-  (no required status checks list because the workflow job names don't yet
-  match the gate names; F5 fixes this in a follow-up PR).
+  exercised the loose-but-required branch protection - no required status
+  checks list because the workflow job names don't yet match the gate names.
+  F5 (rename workflow job IDs + re-tighten branch protection) lands in a
+  follow-up PR in this same session.
+- Pre-existing CI failures observed on this PR (pre-existing scaffold-only
+  problems from PR-4 / PR-11; not introduced here):
+  - `trufflehog` - `--fail` flag repeated on extra_args; one-line workflow fix.
+  - `clang-tidy` + `gcc-fanalyzer` - workflows call `cmake --preset=dev` but
+    `slave/CMakePresets.json` defines `ci-coverage` / `ci-sanitize` / `ci-ubuntu`
+    only. Fix: workflows should use `ci-ubuntu` (or `slave/cmake/dev-mode.cmake`
+    should add a `dev` preset). F5 owns the workflow rename + this fix.
+  - `dependency-review` - requires Dependency Graph enabled on the repo (works
+    for public repos with GHAS); not blocking on a fresh public repo.
