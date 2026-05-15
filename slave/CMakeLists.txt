@@ -105,11 +105,21 @@ target_include_directories(
     "\$<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/export>"
 )
 
-target_compile_features(tethys_slave PUBLIC c_std_11)
+# `target_compile_features(... c_std_11)` walks CMake's compiler-feature
+# database which is unpopulated for arm-none-eabi-gcc (CMake only ships
+# feature tables for hosted compilers). Use the direct property pair instead;
+# semantically identical for our use - C11 is required, no GNU extensions.
+set_target_properties(tethys_slave PROPERTIES
+    C_STANDARD 11
+    C_STANDARD_REQUIRED ON
+    C_EXTENSIONS OFF)
 
 # ---- Install rules ----
-
-if(NOT CMAKE_SKIP_INSTALL_RULES)
+#
+# Install rules are host-side concerns (lib + headers go under
+# CMAKE_INSTALL_PREFIX). Skip them when cross-compiling for STM32 - we ship
+# the cross-built libtethys_slave.a as a CI artefact, not as a system install.
+if(NOT CMAKE_SKIP_INSTALL_RULES AND NOT CMAKE_CROSSCOMPILING)
   include(cmake/install-rules.cmake)
 endif()
 

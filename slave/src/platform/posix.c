@@ -19,6 +19,23 @@
  * Copyright (c) 2026 Tethys contributors. SPDX-License-Identifier: MIT.
  */
 
+/*
+ * Feature-test macros must be defined BEFORE any system headers so that
+ * POSIX.1-2001 declarations (clock_gettime, CLOCK_MONOTONIC, sched_yield)
+ * are visible. Without these, building with `-std=c11` on glibc + clang
+ * produces "use of undeclared identifier 'CLOCK_MONOTONIC'" errors.
+ */
+#if !defined(_WIN32)
+#  if !defined(_POSIX_C_SOURCE) || (_POSIX_C_SOURCE < 200112L)
+#    undef  _POSIX_C_SOURCE
+#    define _POSIX_C_SOURCE 200809L
+#  endif
+#  if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE < 700)
+#    undef  _XOPEN_SOURCE
+#    define _XOPEN_SOURCE 700
+#  endif
+#endif
+
 #include "tethys/platform.h"
 
 #include <stdio.h>
