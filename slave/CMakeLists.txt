@@ -48,6 +48,7 @@ add_library(
     src/transport/transport.c
     src/transport/loopback.c
     src/transport/socketcan.c
+    src/transport/uart_sxi.c
 )
 add_library(tethys::slave ALIAS tethys_slave)
 

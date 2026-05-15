@@ -46,6 +46,15 @@ This note is opened by PR-A and amended by PR-B / PR-C as their "Implementation 
 | D47 | CCSDS COP-1 wrap deferred | The Phase-5 UART/SxI transport (PR-B) is raw bytes only: framing = start byte + length + payload + checksum, no ARQ. The COP-1 AD (Automatic Repeat reQuest) wrapper that ADR-0010 row 8 references is Phase 8 (space profile) work. | Ship COP-1 in PR-B - doubles the LOC budget and pulls Phase 8 design forward; the conformance suite can already drive raw UART. | ADR-0010 row 8; parent §8 Phase 8 |
 | D48 | SocketCAN error-frame translation | The slave-side `socketcan.c` subscribes to `CAN_ERR_BUSOFF`, `CAN_ERR_BUSERROR`, and `CAN_ERR_RESTARTED` via `CAN_RAW_ERR_FILTER` and translates them into TAL events (`BUS_OFF`, `LOSS`, `BUS_RECOVERED`). | Silent drop of error frames - loses the ADR-0004 event-API contract for CAN-FD. | ADR-0004 event API; ISO 11898-1:2024 |
 
+## Decisions (PR-B)
+
+| # | Decision | Choice | Rejected | Cite / Trace |
+|---|---|---|---|---|
+| D49 | UART framing | Length-prefixed: `[0xAA][len][payload..][xor_cksum]`. No escape characters because the protocol layer's CTO/DTO is already length-prefixed; byte stuffing would double encoding work for zero correctness gain at this layer. | SLIP-style with 0xC0/0xDB escape | RFC 1055; PR-B sub-plan |
+| D50 | Slave C portability | Slave-side UART transport is **byte-pumped** by host integration code via `tethys_tr_uart_sxi_inject_rx_byte()` and `tethys_tr_uart_sxi_drain_tx_bytes()`. No OS-specific tty / SPI / USART code in `slave/src/transport/uart_sxi.c`. STM32 firmware wires the USART ISR; posix-sim wires pyserial through the simulator. | Embed termios open() in the slave - couples the slave to POSIX | parent §3.2 portability; ADR-0005 |
+| D51 | Python pyserial dep | Pin `pyserial==3.5` (BSD-3, widely deployed, mature). | python-can - already rejected for SocketCAN; no Python-native serial alternative covers Win32 COM ports + POSIX termios as cleanly. | `version-pinning.mdc`, `free-tool-only.mdc` |
+| D52 | Conformance UART row | POSIX-only via `pty.openpty()` + a kernel-level relay between the two pty masters. Windows skips the row (no portable pty); `test_transport_uart_sxi.py`'s framer-only tests run everywhere as the cross-platform fallback. | Use a TCP socket pair to fake UART - changes the wire shape; pty pair preserves the byte-stream semantics for an honest conformance assertion. | parent §8 Phase 5; `pty` stdlib |
+
 ## Implementation Reference
 
 - **PR-A**: *to be filled at merge - TAL header + loopback + SocketCAN + conformance suite scaffold*
@@ -61,22 +70,32 @@ This note is opened by PR-A and amended by PR-B / PR-C as their "Implementation 
 - **`docs/traceability.csv` rows**: Worker D owns this file. PR-A's new files have provisional row IDs (`TETHYS-DES-0030..0034` + `TETHYS-TST-0050..0067`) which Worker D materialises in the traceability matrix; this note records them so Worker D can reference us when they land their rows.
 - **CMake build of new C files**: PR-A adds the three new sources to `slave/CMakeLists.txt`'s `add_library` block; cppcheck-misra and clang-tidy CI run unchanged because the new files honour the same rules as `xcp_dispatcher.c`. Worker E owns `slave/cmake/` and `slave/profiles/`; no profile-cmake changes are needed for PR-A.
 
-## Test results (PR-A target)
+## Test results (PR-B target)
 
 ```text
-[master pytest]
+[master pytest, Windows]
 test_transport_loopback.py            8 passed
-test_transport_conformance.py         7 passed (loopback row only on Windows)
-test_transport_socketcan.py           4 skipped (Linux + vcan0 required)
+test_transport_conformance.py         7 passed (loopback row only)
+test_transport_socketcan.py           4 skipped (Linux + vcan0)
+test_transport_uart_sxi.py           11 passed, 1 skipped (POSIX pty)
+TOTAL                                67 passed, 5 skipped
 
-[Ceedling test:all]
+[master pytest, Linux CI projection]
++ SocketCAN conformance row           7 cells (vcan0 required)
++ UART conformance row                7 cells (pty pair)
++ test_transport_socketcan.py         4 cases (vcan0 required)
++ test_uart_pty_round_trip            1 case
+TOTAL                                86 passed
+
+[Ceedling test:all, posix-sim]
 test_transport_loopback.c            10 passed
-test_transport_conformance.c         10 passed (SocketCAN ops gated by descriptor availability)
+test_transport_conformance.c         11 passed (UART metadata row added)
+test_transport_uart_sxi.c             8 passed
 ```
 
-Phase 5 acceptance criterion ("same DAQ test passes on three transports") remains **partial after PR-A**:
-- transport #1: loopback - PR-A.
-- transport #2: SocketCAN - PR-A (vcan0 on Linux CI; stub on other hosts).
-- transport #3: UART/SxI - **PR-B**.
+Phase 5 acceptance criterion ("same DAQ test passes on three transports") status after PR-B:
+- transport #1: loopback - PR-A ✓
+- transport #2: SocketCAN - PR-A ✓ (vcan0 on Linux CI; stub on other hosts)
+- transport #3: UART/SxI - PR-B ✓ (pty pair on POSIX CI; framer-only tests on Windows)
 
-PR-C flips `p5` to `completed` once PR-B's transport lands and the conformance suite is green across all three rows on a Linux CI runner.
+PR-C closes the deferred items (drop/reorder/duplicate synthesis on every transport, UDP `info` field, parent-plan `p5` status flip).

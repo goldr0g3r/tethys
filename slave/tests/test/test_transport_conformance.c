@@ -35,6 +35,7 @@
  */
 #include "tethys/transport_loopback.h"
 #include "tethys/transport_socketcan.h"
+#include "tethys/transport_uart_sxi.h"
 #include "tethys/tethys_transport.h"
 
 #include "unity.h"
@@ -46,6 +47,7 @@
 TEST_SOURCE_FILE("transport.c")
 TEST_SOURCE_FILE("loopback.c")
 TEST_SOURCE_FILE("socketcan.c")
+TEST_SOURCE_FILE("uart_sxi.c")
 
 /* -------- Test fixture ------------------------------------------------ */
 
@@ -60,6 +62,7 @@ typedef struct {
 static const conformance_target_t g_targets[] = {
     {tethys_tr_loopback_descriptor, true,  "loopback"},
     {tethys_tr_socketcan_descriptor, false, "socketcan"},
+    {tethys_tr_uart_sxi_descriptor,  false, "uart_sxi"},
 };
 
 static const size_t g_target_count = sizeof g_targets / sizeof g_targets[0];
@@ -248,6 +251,19 @@ void test_socketcan_descriptor_metadata(void)
     TEST_ASSERT_EQUAL_INT(TETHYS_TR_SOCKETCAN, desc->id);
     TEST_ASSERT_EQUAL_STRING("socketcan", desc->name);
     /* CAN-FD MTU per ISO 11898-1:2024. */
+    TEST_ASSERT_EQUAL_UINT16((uint16_t)64U, desc->mtu);
+    TEST_ASSERT_FALSE(desc->supports_reliable);
+    TEST_ASSERT_TRUE(desc->supports_ordering);
+}
+
+void test_uart_sxi_descriptor_metadata(void)
+{
+    tethys_tr_descriptor_t const *const desc = tethys_tr_uart_sxi_descriptor();
+    TEST_ASSERT_NOT_NULL(desc);
+    TEST_ASSERT_EQUAL_INT(TETHYS_TR_UART_SXI, desc->id);
+    TEST_ASSERT_EQUAL_STRING("uart_sxi", desc->name);
+    /* UART/SxI MTU; smaller than loopback's 256 to fit the STM32F7 USART
+     * ISR fast-path memory budget. */
     TEST_ASSERT_EQUAL_UINT16((uint16_t)64U, desc->mtu);
     TEST_ASSERT_FALSE(desc->supports_reliable);
     TEST_ASSERT_TRUE(desc->supports_ordering);
