@@ -1,21 +1,23 @@
-"""posix-sim XCP slave - asyncio UDP server implementing the Phase-1 command set.
+"""posix-sim XCP slave - asyncio UDP server (Phase 1 + Phase 2 read path).
 
 This is a Python-side functional twin of the C dispatcher in
 ``slave/src/core/xcp_dispatcher.c``. Both must agree on the wire-level
 behaviour of the supported commands so the acceptance bench can swap
-between them transparently.
+between them transparently. Phase 2 PR-28 adds SET_MTA / UPLOAD /
+SHORT_UPLOAD against a deterministic 1 KiB ramp-pattern memory backend.
 
-Cite: ASAM XCP 1.4 Part 2 §1.3.2 + §1.4.2.1
-Cite: parent plan section 7 (Phase 1 acceptance)
+Cite: ASAM XCP 1.4 Part 2 §1.3.2 + §1.3.3 + §1.4.2.1
+Cite: parent plan §8 (Phase 2 acceptance)
 """
 
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from tethys_master.logging_setup import get_logger
 from tethys_master.protocol.frame import (
+    XCP_MAX_UPLOAD_BYTES,
     ConnectResponse,
     GetStatusResponse,
     GetVersionResponse,
@@ -25,6 +27,14 @@ from tethys_master.protocol.frame import (
     encode_error_response,
     encode_positive_response,
 )
+
+SIM_MEMORY_SIZE = 1024
+"""Size of the simulator's virtual memory backend (1 KiB)."""
+
+
+def _ramp_memory(size: int = SIM_MEMORY_SIZE) -> bytearray:
+    """Generate a deterministic ramp pattern so UPLOAD tests are stable."""
+    return bytearray((i & 0xFF) for i in range(size))
 
 logger = get_logger(__name__)
 
@@ -38,6 +48,9 @@ class SlaveState:
     resource_protection: int = 0x00
     state_number: int = 0x00
     session_configuration_id: int = 0xABCD
+    mta_address: int = 0
+    mta_extension: int = 0
+    memory: bytearray = field(default_factory=_ramp_memory)
 
 
 class XcpSimSlave:
@@ -155,5 +168,61 @@ class XcpSimSlave:
             )
             logger.info("sim.cmd.get_version")
             return encode_positive_response(version_response.encode_body())
+        if cmd == XcpCommand.SET_MTA:
+            return self._handle_set_mta(packet)
+        if cmd == XcpCommand.UPLOAD:
+            return self._handle_upload(packet)
+        if cmd == XcpCommand.SHORT_UPLOAD:
+            return self._handle_short_upload(packet)
         logger.warning("sim.cmd.unknown", cmd=hex(cmd))
         return encode_error_response(XcpError.ERR_CMD_UNKNOWN)
+
+    # ---- Phase 2 read-path handlers -------------------------------
+
+    def _handle_set_mta(self, packet: bytes) -> bytes:
+        if not self._state.connected:
+            logger.warning("sim.cmd.set_mta.not_connected")
+            return encode_error_response(XcpError.ERR_ACCESS_DENIED)
+        if len(packet) < 8:
+            return encode_error_response(XcpError.ERR_CMD_SYNTAX)
+        self._state.mta_extension = packet[3]
+        self._state.mta_address = int.from_bytes(packet[4:8], byteorder="little", signed=False)
+        logger.info(
+            "sim.cmd.set_mta",
+            address=hex(self._state.mta_address),
+            extension=self._state.mta_extension,
+        )
+        return encode_positive_response(b"")
+
+    def _handle_upload(self, packet: bytes) -> bytes:
+        if not self._state.connected:
+            logger.warning("sim.cmd.upload.not_connected")
+            return encode_error_response(XcpError.ERR_ACCESS_DENIED)
+        if len(packet) < 2:
+            return encode_error_response(XcpError.ERR_CMD_SYNTAX)
+        num = packet[1]
+        if num < 1 or num > XCP_MAX_UPLOAD_BYTES:
+            return encode_error_response(XcpError.ERR_OUT_OF_RANGE)
+        start = self._state.mta_address
+        if start + num > len(self._state.memory):
+            return encode_error_response(XcpError.ERR_OUT_OF_RANGE)
+        chunk = bytes(self._state.memory[start : start + num])
+        self._state.mta_address += num
+        logger.info("sim.cmd.upload", start=hex(start), num=num)
+        return encode_positive_response(chunk)
+
+    def _handle_short_upload(self, packet: bytes) -> bytes:
+        if not self._state.connected:
+            logger.warning("sim.cmd.short_upload.not_connected")
+            return encode_error_response(XcpError.ERR_ACCESS_DENIED)
+        if len(packet) < 8:
+            return encode_error_response(XcpError.ERR_CMD_SYNTAX)
+        num = packet[1]
+        if num < 1 or num > XCP_MAX_UPLOAD_BYTES:
+            return encode_error_response(XcpError.ERR_OUT_OF_RANGE)
+        address = int.from_bytes(packet[4:8], byteorder="little", signed=False)
+        if address + num > len(self._state.memory):
+            return encode_error_response(XcpError.ERR_OUT_OF_RANGE)
+        chunk = bytes(self._state.memory[address : address + num])
+        logger.info("sim.cmd.short_upload", address=hex(address), num=num)
+        return encode_positive_response(chunk)

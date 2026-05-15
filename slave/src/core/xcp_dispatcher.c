@@ -1,10 +1,10 @@
 /*
- * src/core/xcp_dispatcher.c - XCP command dispatcher (Phase 1 subset).
+ * src/core/xcp_dispatcher.c - XCP command dispatcher (Phase 1 + Phase 2 read path).
  *
  * Module: tethys::core::xcp_dispatcher
  * Profiles: all
- * Standards: ASAM XCP 1.4 Part 2 §1.3.2 + §1.4.2.1; MISRA C:2023
- * Trace: docs/traceability.csv (rows TETHYS-DES-0001..0004 land at PR-10)
+ * Standards: ASAM XCP 1.4 Part 2 §1.3.2 + §1.3.3 + §1.4.2.1; MISRA C:2023
+ * Trace: docs/traceability.csv (rows TETHYS-DES-0001..0007 land at PR-10)
  *
  * Copyright (c) 2026 Tethys contributors. SPDX-License-Identifier: MIT.
  */
@@ -105,6 +105,184 @@ static size_t write_disconnect_response(uint8_t* response, size_t resp_cap)
     return (size_t)1U;
 }
 
+/**
+ * @brief Decode a little-endian u32 from 4 wire bytes.
+ *
+ * MISRA-friendly byte-by-byte read; no aliased load.
+ */
+static uint32_t decode_u32_le(uint8_t const* p)
+{
+    return ((uint32_t)p[0])
+         | ((uint32_t)p[1] << 8U)
+         | ((uint32_t)p[2] << 16U)
+         | ((uint32_t)p[3] << 24U);
+}
+
+/**
+ * @brief Check whether the requested span lies within attached memory.
+ *
+ * Defensive against u32 overflow (address + len wrap).
+ */
+static bool memory_span_ok(tethys_xcp_state_t const* state, uint32_t address, size_t len)
+{
+    if (state->memory == NULL) {
+        return false;
+    }
+    if (len == (size_t)0U) {
+        return true;
+    }
+    if (address > (uint32_t)0xFFFFFFFFU - (uint32_t)len) {
+        return false;
+    }
+    uint64_t const end = (uint64_t)address + (uint64_t)len;
+    return end <= (uint64_t)state->memory_size;
+}
+
+/**
+ * @brief Write the body of an UPLOAD or SHORT_UPLOAD response.
+ *
+ * Layout: [0] PID=RES, [1..N] N bytes copied from memory[start .. start+N).
+ *
+ * @return 1 + n_bytes on success; 0 if response buffer is too small.
+ */
+static size_t write_upload_response(
+    uint8_t*       response,
+    size_t         resp_cap,
+    uint8_t const* memory,
+    uint32_t       start,
+    uint8_t        n_bytes)
+{
+    size_t const required = (size_t)1U + (size_t)n_bytes;
+    if (resp_cap < required) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    /* MISRA-compliant bounded copy: n_bytes is u8 so the loop is bounded by 0..255. */
+    for (uint8_t i = (uint8_t)0U; i < n_bytes; ++i) {
+        response[(size_t)1U + (size_t)i] = memory[(size_t)start + (size_t)i];
+    }
+    return required;
+}
+
+/* ---- Phase 2 read-path handlers --------------------------------------- */
+
+/**
+ * @brief Handle SET_MTA (0xF6).
+ *
+ * Wire layout (XCP 1.4 Part 2 §1.3.3.1):
+ *   [0]    PID = 0xF6
+ *   [1..2] reserved
+ *   [3]    address_extension
+ *   [4..7] address (4 bytes, little-endian)
+ *
+ * @return number of bytes written to @p response.
+ */
+static size_t handle_set_mta(
+    tethys_xcp_state_t* state,
+    uint8_t const*      request,
+    size_t              req_len,
+    uint8_t*            response,
+    size_t              resp_cap)
+{
+    if (!state->connected) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (req_len < (size_t)8U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    state->mta_extension = request[3];
+    state->mta_address   = decode_u32_le(&request[4]);
+    if (resp_cap < (size_t)1U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    return (size_t)1U;
+}
+
+/**
+ * @brief Handle UPLOAD (0xF5).
+ *
+ * Wire layout (XCP 1.4 Part 2 §1.3.3.2):
+ *   [0] PID = 0xF5
+ *   [1] N (1..MAX_CTO-1 = 1..7)
+ *
+ * Side-effect: MTA auto-increments by N on success.
+ *
+ * @return number of bytes written to @p response.
+ */
+static size_t handle_upload(
+    tethys_xcp_state_t* state,
+    uint8_t const*      request,
+    size_t              req_len,
+    uint8_t*            response,
+    size_t              resp_cap)
+{
+    if (!state->connected) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (state->memory == NULL) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (req_len < (size_t)2U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    uint8_t const n_bytes = request[1];
+    if ((n_bytes == (uint8_t)0U) || (n_bytes > (uint8_t)(TETHYS_XCP_MAX_CTO - 1U))) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    if (!memory_span_ok(state, state->mta_address, (size_t)n_bytes)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    size_t const written = write_upload_response(
+        response, resp_cap, state->memory, state->mta_address, n_bytes);
+    if (written == (size_t)0U) {
+        return (size_t)0U;
+    }
+    state->mta_address += (uint32_t)n_bytes;
+    return written;
+}
+
+/**
+ * @brief Handle SHORT_UPLOAD (0xF4).
+ *
+ * Wire layout (XCP 1.4 Part 2 §1.3.3.6):
+ *   [0]    PID = 0xF4
+ *   [1]    N (1..MAX_CTO-1)
+ *   [2]    reserved
+ *   [3]    address_extension
+ *   [4..7] address (4 bytes, little-endian)
+ *
+ * Side-effect: MTA is NOT updated (stateless per spec).
+ *
+ * @return number of bytes written to @p response.
+ */
+static size_t handle_short_upload(
+    tethys_xcp_state_t* state,
+    uint8_t const*      request,
+    size_t              req_len,
+    uint8_t*            response,
+    size_t              resp_cap)
+{
+    if (!state->connected) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (state->memory == NULL) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (req_len < (size_t)8U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    uint8_t const n_bytes = request[1];
+    if ((n_bytes == (uint8_t)0U) || (n_bytes > (uint8_t)(TETHYS_XCP_MAX_CTO - 1U))) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    uint32_t const address = decode_u32_le(&request[4]);
+    if (!memory_span_ok(state, address, (size_t)n_bytes)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    return write_upload_response(response, resp_cap, state->memory, address, n_bytes);
+}
+
 /* ---- Public API ------------------------------------------------------- */
 
 void tethys_xcp_init(tethys_xcp_state_t* state)
@@ -117,6 +295,19 @@ void tethys_xcp_init(tethys_xcp_state_t* state)
     state->resource_protection = (uint8_t)0U;
     state->state_number = (uint8_t)0U;
     state->session_configuration_id = (uint16_t)0xABCDU; /* arbitrary; A2L XCP_ID picks the real one */
+    state->mta_address   = (uint32_t)0U;
+    state->mta_extension = (uint8_t)0U;
+    state->memory        = NULL;
+    state->memory_size   = (size_t)0U;
+}
+
+void tethys_xcp_attach_memory(tethys_xcp_state_t* state, uint8_t* mem, size_t size)
+{
+    if (state == NULL) {
+        return;
+    }
+    state->memory      = mem;
+    state->memory_size = (mem == NULL) ? (size_t)0U : size;
 }
 
 int tethys_xcp_dispatch(
@@ -167,6 +358,15 @@ int tethys_xcp_dispatch(
             written = write_get_version_response(response, resp_cap);
         }
     }
+    else if (cmd == TETHYS_XCP_CMD_SET_MTA) {
+        written = handle_set_mta(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_UPLOAD) {
+        written = handle_upload(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_SHORT_UPLOAD) {
+        written = handle_short_upload(state, request, req_len, response, resp_cap);
+    }
     else {
         written = write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
     }
@@ -175,7 +375,5 @@ int tethys_xcp_dispatch(
         return -1;
     }
     *resp_len = written;
-    /* Suppress unused-warning when -Wunused-parameter is on but we don't need req_len after cmd byte */
-    (void)req_len;
     return 0;
 }

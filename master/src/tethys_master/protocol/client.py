@@ -1,7 +1,8 @@
 """High-level XCP client (master side).
 
 Wraps a :class:`Transport` with the request/response orchestration for
-the Phase 1 command set. Phase 2 extends to the full command set.
+the Phase 1 + Phase 2 read-path command set. Phase 2 PR-29 extends to
+DOWNLOAD / BUILD_CHECKSUM / SYNCH.
 
 Cite: ASAM XCP 1.4 Part 2 §1.3 (Standard Command set)
 Cite: ADR-0004 (transport abstraction layer)
@@ -21,6 +22,10 @@ from tethys_master.protocol.frame import (
     GetStatusResponse,
     GetVersionRequest,
     GetVersionResponse,
+    SetMtaRequest,
+    ShortUploadRequest,
+    UploadRequest,
+    UploadResponse,
     XcpPacketId,
     parse_response,
 )
@@ -122,3 +127,50 @@ class XcpClient:
             transport=f"{response.transport_major}.{response.transport_minor}",
         )
         return response
+
+    # ---- Phase 2 read path ------------------------------------------
+
+    async def set_mta(self, address: int, address_extension: int = 0) -> None:
+        """SET_MTA - position the slave's Memory Transfer Address.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.3.3.1
+        """
+        logger.info("xcp.set_mta.start", address=hex(address), extension=address_extension)
+        request = SetMtaRequest(address=address, address_extension=address_extension).encode()
+        body = self._ensure_positive(await self._request(request))
+        if body:
+            logger.warning("xcp.set_mta.unexpected_body", bytes=len(body))
+        logger.info("xcp.set_mta.ok")
+
+    async def upload(self, num_bytes: int) -> bytes:
+        """UPLOAD ``num_bytes`` bytes from the current MTA (auto-increments).
+
+        Cite: ASAM XCP 1.4 Part 2 §1.3.3.2
+        """
+        logger.info("xcp.upload.start", num_bytes=num_bytes)
+        request = UploadRequest(num_bytes=num_bytes).encode()
+        body = self._ensure_positive(await self._request(request))
+        response = UploadResponse.decode(body)
+        if len(response.data) < num_bytes:
+            logger.warning("xcp.upload.short_response", got=len(response.data), want=num_bytes)
+        logger.info("xcp.upload.ok", got=len(response.data))
+        return response.data[:num_bytes]
+
+    async def short_upload(self, num_bytes: int, address: int, address_extension: int = 0) -> bytes:
+        """SHORT_UPLOAD - stateless read of ``num_bytes`` from ``address``.
+
+        Does not modify the slave's MTA. Cite: ASAM XCP 1.4 Part 2 §1.3.3.6
+        """
+        logger.info(
+            "xcp.short_upload.start",
+            num_bytes=num_bytes,
+            address=hex(address),
+            extension=address_extension,
+        )
+        request = ShortUploadRequest(
+            num_bytes=num_bytes, address=address, address_extension=address_extension
+        ).encode()
+        body = self._ensure_positive(await self._request(request))
+        response = UploadResponse.decode(body)
+        logger.info("xcp.short_upload.ok", got=len(response.data))
+        return response.data[:num_bytes]

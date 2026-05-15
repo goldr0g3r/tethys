@@ -2,6 +2,7 @@
 
 Cite: ASAM XCP 1.4 Part 2 §1.3.2 (CONNECT/DISCONNECT/GET_STATUS)
 Cite: ASAM XCP 1.4 Part 2 §1.4.2.1 (GET_VERSION)
+Cite: ASAM XCP 1.4 Part 2 §1.3.3 (SET_MTA/UPLOAD/SHORT_UPLOAD)
 """
 
 from __future__ import annotations
@@ -9,6 +10,7 @@ from __future__ import annotations
 import pytest
 
 from tethys_master.protocol.frame import (
+    XCP_MAX_UPLOAD_BYTES,
     ConnectRequest,
     ConnectResponse,
     DisconnectRequest,
@@ -18,6 +20,10 @@ from tethys_master.protocol.frame import (
     GetVersionRequest,
     GetVersionResponse,
     ResourceMask,
+    SetMtaRequest,
+    ShortUploadRequest,
+    UploadRequest,
+    UploadResponse,
     XcpCommand,
     XcpError,
     XcpPacketId,
@@ -153,3 +159,77 @@ class TestPacketHelpers:
     def test_parse_response_empty_raises(self) -> None:
         with pytest.raises(ValueError, match="Empty"):
             parse_response(b"")
+
+
+# ---- Phase 2 read-path frames ----------------------------------------
+
+
+class TestSetMtaRequest:
+    def test_encode_layout(self) -> None:
+        request = SetMtaRequest(address=0x12345678, address_extension=0xAB)
+        encoded = request.encode()
+        assert len(encoded) == 8
+        assert encoded[0] == XcpCommand.SET_MTA
+        assert encoded[1] == 0
+        assert encoded[2] == 0
+        assert encoded[3] == 0xAB
+        assert encoded[4:8] == b"\x78\x56\x34\x12"  # little-endian
+
+    def test_encode_zero_extension_default(self) -> None:
+        encoded = SetMtaRequest(address=0).encode()
+        assert encoded[3] == 0
+        assert encoded[4:8] == b"\x00\x00\x00\x00"
+
+    def test_encode_rejects_oversized_address(self) -> None:
+        with pytest.raises(ValueError, match="address"):
+            SetMtaRequest(address=0x1_0000_0000).encode()
+
+    def test_encode_rejects_oversized_extension(self) -> None:
+        with pytest.raises(ValueError, match="extension"):
+            SetMtaRequest(address=0, address_extension=0x100).encode()
+
+
+class TestUploadRequest:
+    def test_encode_layout(self) -> None:
+        encoded = UploadRequest(num_bytes=4).encode()
+        assert encoded == bytes([XcpCommand.UPLOAD, 4])
+
+    @pytest.mark.parametrize("num_bytes", [0, XCP_MAX_UPLOAD_BYTES + 1, -1])
+    def test_encode_rejects_out_of_range(self, num_bytes: int) -> None:
+        with pytest.raises(ValueError, match="num_bytes"):
+            UploadRequest(num_bytes=num_bytes).encode()
+
+
+class TestShortUploadRequest:
+    def test_encode_layout(self) -> None:
+        encoded = ShortUploadRequest(num_bytes=4, address=0xCAFEBABE, address_extension=1).encode()
+        assert len(encoded) == 8
+        assert encoded[0] == XcpCommand.SHORT_UPLOAD
+        assert encoded[1] == 4
+        assert encoded[2] == 0
+        assert encoded[3] == 1
+        assert encoded[4:8] == b"\xbe\xba\xfe\xca"
+
+    @pytest.mark.parametrize("num_bytes", [0, XCP_MAX_UPLOAD_BYTES + 1])
+    def test_encode_rejects_out_of_range_num(self, num_bytes: int) -> None:
+        with pytest.raises(ValueError, match="num_bytes"):
+            ShortUploadRequest(num_bytes=num_bytes, address=0).encode()
+
+    def test_encode_rejects_oversized_address(self) -> None:
+        with pytest.raises(ValueError, match="address"):
+            ShortUploadRequest(num_bytes=1, address=0x1_0000_0000).encode()
+
+    def test_encode_rejects_oversized_extension(self) -> None:
+        with pytest.raises(ValueError, match="extension"):
+            ShortUploadRequest(num_bytes=1, address=0, address_extension=0x100).encode()
+
+
+class TestUploadResponse:
+    def test_roundtrip(self) -> None:
+        original = UploadResponse(data=b"\x10\x11\x12\x13")
+        decoded = UploadResponse.decode(original.encode_body())
+        assert decoded.data == original.data
+
+    def test_decode_empty_payload(self) -> None:
+        decoded = UploadResponse.decode(b"")
+        assert decoded.data == b""
