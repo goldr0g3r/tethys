@@ -1,0 +1,224 @@
+/* Tethys Phase-10 verification fixture: realistic A2L file.
+
+   Mid-size A2L file with 12 MEASUREMENT and 6 CHARACTERISTIC blocks,
+   chosen to mirror a typical small ECU calibration project (a single
+   marine engine controller; signals overlap the marine_demo.a2l surface
+   intentionally so the same A2L hash gate exercises both fixtures).
+
+   Used by:
+     - .github/workflows/a2l-roundtrip.yml (parse -> emit -> parse)
+     - master/tests/test_a2l.py mid-size round-trip
+     - slave/fuzz/corpus/a2l/ seed for the atheris harness
+     - Phase-6 GUI tree-view (TODO Phase 6)
+     - Phase-7 marine STM32 demo workload (TODO Phase 7) — overlaps with
+       slave/tests/fixtures/marine_demo.a2l on rpm + coolant + injector
+
+   Standards: ASAM MCD-2 MC v1.7 §4.4.1 PROJECT; §4.4.2 MODULE;
+              §4.4.10 CHARACTERISTIC; §4.4.18 MEASUREMENT.
+   Trace: docs/traceability.csv row TETHYS-DES-0011 + TETHYS-REQ-VER-003 +
+          TETHYS-REQ-MARINE-001.
+*/
+/begin PROJECT tethys_realistic "Tethys realistic marine controller fixture"
+  /begin MODULE marine_ctrl "Marine engine controller (realistic subset)"
+    /* ---- 12 MEASUREMENT blocks ---------------------------------------- */
+    /begin MEASUREMENT
+      engine_rpm
+      "Engine RPM at the flywheel"
+      UWORD
+      rpm_conv
+      1
+      0.5
+      0.0
+      8000.0
+      ECU_ADDRESS 0x20001000
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      coolant_temp
+      "Coolant temperature degC"
+      SWORD
+      degc_conv
+      1
+      0.25
+      -40.0
+      125.0
+      ECU_ADDRESS 0x20001004
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      oil_pressure
+      "Oil pressure bar"
+      UWORD
+      bar_conv
+      1
+      0.1
+      0.0
+      10.0
+      ECU_ADDRESS 0x20001008
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      fuel_rail_pressure
+      "Common-rail fuel pressure bar"
+      UWORD
+      bar_conv
+      1
+      0.5
+      0.0
+      2500.0
+      ECU_ADDRESS 0x2000100C
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      injector_duty_pct
+      "Injector duty cycle percent read-back"
+      FLOAT32_IEEE
+      pct_conv
+      1
+      0.1
+      0.0
+      100.0
+      ECU_ADDRESS 0x20001010
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      turbo_boost_pressure
+      "Turbocharger boost pressure bar"
+      UWORD
+      bar_conv
+      1
+      0.1
+      0.0
+      4.0
+      ECU_ADDRESS 0x20001014
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      intake_air_temp
+      "Intake air temperature degC"
+      SWORD
+      degc_conv
+      1
+      0.25
+      -40.0
+      125.0
+      ECU_ADDRESS 0x20001018
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      exhaust_gas_temp
+      "Exhaust gas temperature degC"
+      UWORD
+      degc_conv
+      1
+      1.0
+      0.0
+      1200.0
+      ECU_ADDRESS 0x2000101C
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      throttle_position
+      "Throttle position percent"
+      UBYTE
+      pct_conv
+      1
+      0.5
+      0.0
+      100.0
+      ECU_ADDRESS 0x20001020
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      battery_voltage
+      "ECU supply voltage V"
+      UWORD
+      volt_conv
+      1
+      0.01
+      8.0
+      16.0
+      ECU_ADDRESS 0x20001024
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      vehicle_speed
+      "Vehicle speed km/h"
+      UWORD
+      kmh_conv
+      1
+      0.1
+      0.0
+      300.0
+      ECU_ADDRESS 0x20001028
+    /end MEASUREMENT
+    /begin MEASUREMENT
+      engine_load_pct
+      "Engine load percent"
+      UBYTE
+      pct_conv
+      1
+      0.5
+      0.0
+      100.0
+      ECU_ADDRESS 0x2000102C
+    /end MEASUREMENT
+    /* ---- 6 CHARACTERISTIC blocks (calibration tables) ---------------- */
+    /begin CHARACTERISTIC
+      injector_duty_map
+      "16x16 injector duty cycle lookup"
+      MAP
+      0x20002000
+      INJECTOR_RL
+      0.0
+      pct_conv
+      0.0
+      100.0
+    /end CHARACTERISTIC
+    /begin CHARACTERISTIC
+      boost_target_curve
+      "RPM -> boost-pressure target curve"
+      CURVE
+      0x20002400
+      CURVE_RL
+      0.0
+      bar_conv
+      0.0
+      3.5
+    /end CHARACTERISTIC
+    /begin CHARACTERISTIC
+      idle_target_rpm
+      "Target idle RPM constant"
+      VALUE
+      0x20002800
+      SCALAR_RL
+      0.0
+      rpm_conv
+      600.0
+      900.0
+    /end CHARACTERISTIC
+    /begin CHARACTERISTIC
+      max_engine_torque_nm
+      "Maximum permitted engine torque Nm"
+      VALUE
+      0x20002804
+      SCALAR_RL
+      0.0
+      torque_conv
+      0.0
+      3000.0
+    /end CHARACTERISTIC
+    /begin CHARACTERISTIC
+      coolant_warn_threshold
+      "Coolant overtemp warning threshold degC"
+      VALUE
+      0x20002808
+      SCALAR_RL
+      0.0
+      degc_conv
+      80.0
+      115.0
+    /end CHARACTERISTIC
+    /begin CHARACTERISTIC
+      ecu_calibration_id
+      "ECU calibration identifier ASCII"
+      ASCII
+      0x20002820
+      ASCII_RL
+      0.0
+      identity_conv
+      0.0
+      255.0
+    /end CHARACTERISTIC
+  /end MODULE
+/end PROJECT
