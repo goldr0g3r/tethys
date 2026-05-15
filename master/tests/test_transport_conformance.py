@@ -116,6 +116,31 @@ if sys.platform.startswith("linux"):
     TRANSPORTS.append(TransportFactory(name="socketcan", setup=_socketcan_factory))
 
 
+# UART/SxI entry: POSIX pty pair (Linux + macOS). Skips on Windows.
+def _uart_pty_available() -> tuple[bool, str]:
+    if not sys.platform.startswith(("linux", "darwin")):
+        return False, "UART/SxI conformance row requires POSIX pty"
+    try:
+        import pty  # noqa: F401
+
+        import serial  # type: ignore[import-untyped]  # noqa: F401
+    except ImportError as exc:
+        return False, f"missing dependency: {exc}"
+    return True, ""
+
+
+if sys.platform.startswith(("linux", "darwin")):
+
+    @asynccontextmanager
+    async def _uart_factory() -> AsyncIterator[tuple[object, object]]:  # pragma: no cover - POSIX-only
+        from tethys_sim.transport.uart_pty import uart_pty_pair  # type: ignore[import-not-found]
+
+        async with uart_pty_pair() as pair:
+            yield pair
+
+    TRANSPORTS.append(TransportFactory(name="uart_sxi", setup=_uart_factory))
+
+
 def _id_of(factory: TransportFactory) -> str:
     return factory.name
 
@@ -125,6 +150,18 @@ def _maybe_skip_socketcan(factory: TransportFactory) -> None:
         ok, reason = _socketcan_available()
         if not ok:
             pytest.skip(reason)
+
+
+def _maybe_skip_uart(factory: TransportFactory) -> None:
+    if factory.name == "uart_sxi":
+        ok, reason = _uart_pty_available()
+        if not ok:
+            pytest.skip(reason)
+
+
+def _maybe_skip_unavailable(factory: TransportFactory) -> None:
+    _maybe_skip_socketcan(factory)
+    _maybe_skip_uart(factory)
 
 
 # -------- Generic scenarios -----------------------------------------
@@ -185,7 +222,7 @@ async def test_conformance_send_after_close_raises(factory: TransportFactory) ->
 @pytest.mark.parametrize("factory", TRANSPORTS, ids=_id_of)
 @pytest.mark.asyncio
 async def test_conformance_metadata_sanity(factory: TransportFactory) -> None:
-    _maybe_skip_socketcan(factory)
+    _maybe_skip_unavailable(factory)
     async with factory.setup() as (a, _b):
         info = a.info
         assert info.id != TransportId.UNDEFINED
@@ -200,10 +237,12 @@ async def test_conformance_drop_detection(factory: TransportFactory) -> None:
 
     The loopback transport injects loss synthetically; SocketCAN observes
     loss via kernel error frames which we cannot fabricate reliably in
-    test, so the SocketCAN cell skips the assertion but verifies the
-    callback setter accepts a callable (i.e. the wiring exists).
+    test, so non-loopback cells skip the assertion but verify the
+    callback setter accepts a callable (i.e. the wiring exists). UART can
+    in principle inject framing errors but doing that reliably belongs in
+    PR-C's matrix expansion.
     """
-    _maybe_skip_socketcan(factory)
+    _maybe_skip_unavailable(factory)
     captured: list[TransportEventKind] = []
     async with factory.setup() as (a, b):
         b.set_event_callback(lambda ev: captured.append(ev.kind))
@@ -214,7 +253,4 @@ async def test_conformance_drop_detection(factory: TransportFactory) -> None:
             b.inject_loss(count=2)
             assert captured == [TransportEventKind.LOSS]
         else:
-            # For real transports we just assert the wiring is in place;
-            # observing real loss requires fault-injection at the bus level
-            # which is Phase 10 robustness-suite territory.
             assert captured == []
