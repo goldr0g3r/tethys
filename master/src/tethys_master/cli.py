@@ -151,5 +151,24 @@ def connect(ctx: click.Context, target: str, connect_timeout_ms: int | None, mod
     sys.exit(asyncio.run(_run()))
 
 
+@cli.command()
+@click.argument("gui_args", nargs=-1, type=click.UNPROCESSED)
+@click.pass_context
+def gui(ctx: click.Context, gui_args: tuple[str, ...]) -> None:
+    """Launch the PySide6 master GUI (parent plan §3.1, Phase 6).
+
+    Requires the ``[gui]`` optional-dependency group (PySide6 + pyqtgraph).
+    Install with ``uv sync --all-extras`` or ``pip install
+    'tethys-master[gui]'``. Extra positional arguments are forwarded to
+    Qt as ``QApplication`` argv (e.g. ``--platform offscreen``).
+    """
+    logger = ctx.obj[_LOGGER_KEY]
+    logger.info("gui.launch.invoked", extra_args=list(gui_args) or None)
+    from tethys_master.gui.app import main as gui_main
+
+    argv = ["tethys-master-gui", *gui_args]
+    sys.exit(gui_main(argv))
+
+
 if __name__ == "__main__":  # pragma: no cover
     cli()
