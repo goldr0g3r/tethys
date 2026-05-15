@@ -457,12 +457,14 @@ The scorecard is the headline of the README. A reviewer can answer "is this a se
 
 ## 13. Open questions (parked for the relevant phase research note)
 
-- **P3/P5/P8 — RESOLVED in PR-0c**: Packet-loss tolerance budget per (profile × transport × direction × XCP service). Resolved by [ADR-0010 draft](docs/adr/drafts/adr-0010-packet-loss-tolerance-budget.md) (proposed in PR-0c, formalised by PR-3). Full derivation + standards anchoring in [`docs/research/phase-0-system-requirements.md`](docs/research/phase-0-system-requirements.md) §6. SIL 2 lower-band residual envelope (≤ 1e-9/h), per-transport rows for UDP / TCP / CAN-FD / SocketCAN / UART-SxI-with-COP-1 / 1-wire FT CAN / loopback.
-- **P2/P8**: Seed-and-key scheme final choice — `none`, custom 4-byte, or AES-128 derived. Plan currently assumes AES-128 for space profile, 4-byte optional for marine.
-- **P4**: XCP PGM (flash programming) support — in scope or out? PGM roughly doubles slave footprint and adds a bootloader spec. Plan currently parks it as out-of-scope; reconsider at P10.
-- **P7/P8**: Hardware procurement — STM32 Nucleo boards (~$25–40 each) are baseline; if access to a GR716A / RAD750 evaluation kit is possible the space profile gains significant credibility.
-- **P0-issues**: GitHub Issues vs Linear — Linear MCP is available in this workspace. Recommend GitHub Issues for public visibility (matches portfolio goal); Linear for private workstream tracking if desired.
-- **P0**: Repository license — MIT for maximum compatibility, or Apache-2.0 for explicit patent grant. Decision in ADR-0008.
+Audit refreshed 2026-05-15 after PR #4..#26 (Phase 0 complete + Phase 1 complete). Resolution status flipped where downstream PRs already landed the decision.
+
+- **P3/P5/P8 — RESOLVED in PR-0c**: Packet-loss tolerance budget per (profile × transport × direction × XCP service). Resolved by [ADR-0010](docs/adr/0010-packet-loss-tolerance-budget.md) (proposed in PR-0c, formalised by PR-3 / PR #9). Full derivation + standards anchoring in [`docs/research/phase-0-system-requirements.md`](docs/research/phase-0-system-requirements.md) §6. SIL 2 lower-band residual envelope (≤ 1e-9/h), per-transport rows for UDP / TCP / CAN-FD / SocketCAN / UART-SxI-with-COP-1 / 1-wire FT CAN / loopback.
+- **P2/P8 — RESOLVED in PR-3 (PR #9)**: Seed-and-key scheme final choice. Resolved by [ADR-0006 — AES-128 derived seed-and-key (space profile)](docs/adr/0006-aes-128-seed-and-key.md). Space profile: mandatory AES-128 with 16-byte challenge / response per NIST FIPS-197. Marine profile: optional 4-byte simple challenge/response, off by default per [`marine-profile-invariants.mdc`](.cursor/rules/marine-profile-invariants.mdc).
+- **P4**: XCP PGM (flash programming) support — in scope or out? PGM roughly doubles slave footprint and adds a bootloader spec. Plan currently parks it as out-of-scope; reconsider at P10. **Status: still open** — defer to Phase 4 research note.
+- **P7/P8**: Hardware procurement — STM32 Nucleo boards (~$25–40 each) are baseline; if access to a GR716A / RAD750 evaluation kit is possible the space profile gains significant credibility. **Status: still open** — depends on procurement window at Phase 7 kickoff.
+- **P0-issues — RESOLVED in PR #4 (`p0-issues`)**: GitHub Issues vs Linear. Chose GitHub Issues for public visibility (matches portfolio goal). 12 milestones + 52 labels + Projects v2 board "Tethys Roadmap" applied via `gh api` + GitHub MCP per [`docs/research/phase-0-issues-execution.md`](docs/research/phase-0-issues-execution.md). Linear left available for private notes only.
+- **P0 — RESOLVED in PR #25 + ADR-0008**: Repository license. Chose **MIT** for maximum downstream compatibility. Decision formalised in [ADR-0008 — License-free toolchain + repo license](docs/adr/0008-license-free-toolchain.md); `LICENSE` file at repo root added in PR #25 (`chore(release): add MIT LICENSE file at repo root`).
 
 ## 14. Repository layout
 
