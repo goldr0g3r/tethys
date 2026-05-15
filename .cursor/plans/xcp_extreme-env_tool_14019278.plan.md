@@ -55,7 +55,7 @@ todos:
     status: completed
   - id: p6
     content: "Phase 6: master GUI — PySide6 app: connection wizard, A2L tree view, real-time pyqtgraph plots, calibration editor with A2L limit-checks, profile selector (marine/space), MDF4 record/playback, diagnostics pane. Acceptance: keyboard-only navigation passes, all critical actions reachable; smoke test runs headless in CI via pytest-qt."
-    status: pending
+    status: completed
   - id: p7
     content: "Phase 7: marine profile on STM32F4/F7 Nucleo — BSP, FreeRTOS, CAN-FD + Ethernet (W5500) transports, marine.cmake profile flags, demo workload (engine RPM + coolant temp + injector duty as synthetic signals driven by a host-side plant model) at 1 kHz DAQ. Acceptance: 24h soak test, zero leaks, watchdog never tripped; IEC 60945 + IACS UR E22 Rev.3 traceability rows filled in."
     status: pending

@@ -32,9 +32,12 @@ from PySide6.QtWidgets import (
 
 from tethys_master import __version__
 from tethys_master.gui.a2l_tree import A2LTreeView
+from tethys_master.gui.calibration_editor import CalibrationEditor
 from tethys_master.gui.connection_wizard import ConnectionWizard
 from tethys_master.gui.diagnostics_pane import DiagnosticsPane
+from tethys_master.gui.mdf4_panel import MDF4Panel
 from tethys_master.gui.plot_pane import PlotPane
+from tethys_master.gui.profile_selector import Profile, ProfileSelector
 from tethys_master.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -196,7 +199,10 @@ class MainWindow(QMainWindow):
         self._status_daq_rate.setObjectName("status_daq_rate")
         self._status_gap_count = QLabel("Gaps: 0")
         self._status_gap_count.setObjectName("status_gap_count")
+        self._status_profile = QLabel("Profile: marine")
+        self._status_profile.setObjectName("status_profile")
 
+        bar.addPermanentWidget(self._status_profile)
         bar.addPermanentWidget(self._status_connection)
         bar.addPermanentWidget(self._status_daq_rate)
         bar.addPermanentWidget(self._status_gap_count)
@@ -230,25 +236,64 @@ class MainWindow(QMainWindow):
         self._diagnostics_dock.setWidget(self._diagnostics_pane)
         self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._diagnostics_dock)
 
-        # Wire A2L → plot: subscribing a measurement adds a trace.
+        # PR-C right-side docks: calibration editor + MDF4 panel + profile selector.
+        self._calibration_editor = CalibrationEditor(self)
+        self._calibration_dock = QDockWidget("Calibration", self)
+        self._calibration_dock.setObjectName("calibration_dock")
+        self._calibration_dock.setAllowedAreas(
+            Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea
+        )
+        self._calibration_dock.setWidget(self._calibration_editor)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._calibration_dock)
+
+        self._mdf4_panel = MDF4Panel(self)
+        self._mdf4_dock = QDockWidget("MDF4 record / playback", self)
+        self._mdf4_dock.setObjectName("mdf4_dock")
+        self._mdf4_dock.setAllowedAreas(
+            Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea
+        )
+        self._mdf4_dock.setWidget(self._mdf4_panel)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._mdf4_dock)
+        self.tabifyDockWidget(self._calibration_dock, self._mdf4_dock)
+
+        self._profile_selector = ProfileSelector(parent=self)
+        self._profile_dock = QDockWidget("Profile", self)
+        self._profile_dock.setObjectName("profile_dock")
+        self._profile_dock.setAllowedAreas(
+            Qt.DockWidgetArea.RightDockWidgetArea | Qt.DockWidgetArea.LeftDockWidgetArea
+        )
+        self._profile_dock.setWidget(self._profile_selector)
+        self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, self._profile_dock)
+        self.tabifyDockWidget(self._calibration_dock, self._profile_dock)
+        self._calibration_dock.raise_()  # bring Calibration to the front by default
+
+        # Cross-pane wiring
+        # A2L → plot: subscribing a measurement adds a trace.
         self._a2l_tree.measurement_selected.connect(self._plot_pane.subscribe)
+        # A2L → calibration: loading an A2L file hands its CHARACTERISTICs to the editor.
+        self._a2l_tree.measurement_selected.connect(self._on_a2l_measurement_selected)
+        # Profile change: log + propagate to status bar.
+        self._profile_selector.profile_changed.connect(self._on_profile_changed)
 
     def _populate_view_menu(self) -> None:
-        """Hook dock-widget toggle actions into the View menu (PR-B)."""
+        """Hook dock-widget toggle actions into the View menu (PR-B + PR-C)."""
         # ``QDockWidget.toggleViewAction()`` returns a checkable QAction that
         # shows / hides the dock and stays in sync if the user closes it via
         # the dock's title-bar X. Adding it to the View menu is the Qt-idiomatic
         # way to make every pane keyboard-reachable.
-        a2l_toggle = self._a2l_dock.toggleViewAction()
-        a2l_toggle.setText("&A2L tree")
-        a2l_toggle.setObjectName("action_view_a2l")
-        a2l_toggle.setShortcut("Ctrl+Shift+A")
-        diag_toggle = self._diagnostics_dock.toggleViewAction()
-        diag_toggle.setText("&Diagnostics")
-        diag_toggle.setObjectName("action_view_diagnostics")
-        diag_toggle.setShortcut("Ctrl+Shift+D")
-        self._view_menu.addAction(a2l_toggle)
-        self._view_menu.addAction(diag_toggle)
+        toggles: list[tuple[str, str, str, object]] = [
+            ("&A2L tree", "action_view_a2l", "Ctrl+Shift+A", self._a2l_dock),
+            ("&Diagnostics", "action_view_diagnostics", "Ctrl+Shift+D", self._diagnostics_dock),
+            ("&Calibration", "action_view_calibration", "Ctrl+Shift+C", self._calibration_dock),
+            ("&MDF4 record / playback", "action_view_mdf4", "Ctrl+Shift+M", self._mdf4_dock),
+            ("&Profile", "action_view_profile", "Ctrl+Shift+I", self._profile_dock),
+        ]
+        for text, obj_name, shortcut, dock in toggles:
+            toggle = dock.toggleViewAction()  # type: ignore[attr-defined]
+            toggle.setText(text)
+            toggle.setObjectName(obj_name)
+            toggle.setShortcut(shortcut)
+            self._view_menu.addAction(toggle)
 
     # ---- Pane accessors (PR-C, tests) --------------------------------
 
@@ -266,6 +311,44 @@ class MainWindow(QMainWindow):
 
     def diagnostics_dock(self) -> QDockWidget:
         return self._diagnostics_dock
+
+    def calibration_editor(self) -> CalibrationEditor:
+        return self._calibration_editor
+
+    def calibration_dock(self) -> QDockWidget:
+        return self._calibration_dock
+
+    def mdf4_panel(self) -> MDF4Panel:
+        return self._mdf4_panel
+
+    def mdf4_dock(self) -> QDockWidget:
+        return self._mdf4_dock
+
+    def profile_selector(self) -> ProfileSelector:
+        return self._profile_selector
+
+    def profile_dock(self) -> QDockWidget:
+        return self._profile_dock
+
+    # ---- Cross-pane slots --------------------------------------------
+
+    def _on_a2l_measurement_selected(self, _name: str) -> None:
+        # When the operator picks a measurement, push the A2L's CHARACTERISTICs
+        # into the calibration editor so they have something to tune.
+        a2l = self._a2l_tree.current_a2l()
+        # The two Protocols (a2l_tree._A2LCharacteristicLike vs
+        # calibration_editor._A2LCharacteristicLike) are structurally
+        # identical; mypy treats them as distinct because dict[..., Protocol]
+        # is invariant in the value type.
+        self._calibration_editor.set_characteristics(a2l.characteristics)  # type: ignore[arg-type]
+
+    def _on_profile_changed(self, profile_value: str) -> None:
+        self._status_profile.setText(f"Profile: {profile_value}")
+        # Space profile restricts CAL writes to service mode; the editor's
+        # Commit button is disabled by default until a service-mode unlock
+        # lands (post-Phase-6 wiring PR). For now log the constraint.
+        if profile_value == Profile.SPACE.value:
+            logger.info("profile.space.cal_writes_service_mode_only")
 
     # ---- State mutators (called by PR-B / PR-C panels and tests) ------
 
