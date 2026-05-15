@@ -21,17 +21,20 @@ from __future__ import annotations
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
+    QDockWidget,
     QLabel,
     QMainWindow,
     QMessageBox,
     QStatusBar,
-    QTextEdit,
     QToolBar,
     QWidget,
 )
 
 from tethys_master import __version__
+from tethys_master.gui.a2l_tree import A2LTreeView
 from tethys_master.gui.connection_wizard import ConnectionWizard
+from tethys_master.gui.diagnostics_pane import DiagnosticsPane
+from tethys_master.gui.plot_pane import PlotPane
 from tethys_master.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -79,6 +82,7 @@ class MainWindow(QMainWindow):
         self._build_toolbar()
         self._build_status_bar()
         self._build_central_widget()
+        self._populate_view_menu()
         self._update_actions_enabled()
 
         self.connect_requested.connect(self._open_connection_wizard)
@@ -155,12 +159,12 @@ class MainWindow(QMainWindow):
         conn_menu.addAction(self.action_stop_daq)
         conn_menu.addAction(self.action_record)
 
-        # The View menu is populated by PR-B (plot pane toggle, A2L tree
-        # toggle, diagnostics-pane toggle). Empty in PR-A so the keyboard
-        # shortcut Alt+V still anchors a stable menu position.
+        # View menu — populated with dock toggles in :meth:`_populate_view_menu`
+        # after the central + dock widgets are constructed.
         view_menu = menu_bar.addMenu("&View")
         assert view_menu is not None
         view_menu.setObjectName("menu_view")
+        self._view_menu = view_menu
 
         help_menu = menu_bar.addMenu("&Help")
         assert help_menu is not None
@@ -198,23 +202,70 @@ class MainWindow(QMainWindow):
         bar.addPermanentWidget(self._status_gap_count)
 
     def _build_central_widget(self) -> None:
-        # PR-A placeholder; PR-B replaces this with the dock area holding
-        # the A2L tree, plot pane, and diagnostics pane.
-        placeholder = QTextEdit(self)
-        placeholder.setObjectName("central_placeholder")
-        placeholder.setReadOnly(True)
-        placeholder.setPlainText(
-            "Tethys master GUI scaffold (Phase 6, PR-A).\n\n"
-            "Use Connect (Ctrl+K) to open the connection wizard.\n"
-            "Start DAQ (Ctrl+R) / Stop DAQ (Ctrl+T) become available once "
-            "the slave session is up.\n\n"
-            "A2L tree, real-time plots, calibration editor, MDF4 record / "
-            "playback, profile selector, and diagnostics pane ship in "
-            "PR-B and PR-C of Phase 6.\n\n"
-            "See docs/learn/xcp-101.md for the XCP primer."
+        # PR-B layout: real-time plot occupies the centre; A2L tree on the
+        # left dock; diagnostics on the bottom dock. Every pane is
+        # toggleable from the View menu via the dock's built-in
+        # toggleViewAction() so keyboard-only navigation still passes.
+        self._plot_pane = PlotPane(self)
+        self._plot_pane.setObjectName("plot_pane")
+        self.setCentralWidget(self._plot_pane)
+
+        # A2L tree dock (left)
+        self._a2l_tree = A2LTreeView(self)
+        self._a2l_dock = QDockWidget("A2L tree", self)
+        self._a2l_dock.setObjectName("a2l_dock")
+        self._a2l_dock.setAllowedAreas(
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
-        self.setCentralWidget(placeholder)
-        self._central_placeholder = placeholder
+        self._a2l_dock.setWidget(self._a2l_tree)
+        self.addDockWidget(Qt.DockWidgetArea.LeftDockWidgetArea, self._a2l_dock)
+
+        # Diagnostics dock (bottom)
+        self._diagnostics_pane = DiagnosticsPane(self)
+        self._diagnostics_dock = QDockWidget("Diagnostics", self)
+        self._diagnostics_dock.setObjectName("diagnostics_dock")
+        self._diagnostics_dock.setAllowedAreas(
+            Qt.DockWidgetArea.BottomDockWidgetArea | Qt.DockWidgetArea.TopDockWidgetArea
+        )
+        self._diagnostics_dock.setWidget(self._diagnostics_pane)
+        self.addDockWidget(Qt.DockWidgetArea.BottomDockWidgetArea, self._diagnostics_dock)
+
+        # Wire A2L → plot: subscribing a measurement adds a trace.
+        self._a2l_tree.measurement_selected.connect(self._plot_pane.subscribe)
+
+    def _populate_view_menu(self) -> None:
+        """Hook dock-widget toggle actions into the View menu (PR-B)."""
+        # ``QDockWidget.toggleViewAction()`` returns a checkable QAction that
+        # shows / hides the dock and stays in sync if the user closes it via
+        # the dock's title-bar X. Adding it to the View menu is the Qt-idiomatic
+        # way to make every pane keyboard-reachable.
+        a2l_toggle = self._a2l_dock.toggleViewAction()
+        a2l_toggle.setText("&A2L tree")
+        a2l_toggle.setObjectName("action_view_a2l")
+        a2l_toggle.setShortcut("Ctrl+Shift+A")
+        diag_toggle = self._diagnostics_dock.toggleViewAction()
+        diag_toggle.setText("&Diagnostics")
+        diag_toggle.setObjectName("action_view_diagnostics")
+        diag_toggle.setShortcut("Ctrl+Shift+D")
+        self._view_menu.addAction(a2l_toggle)
+        self._view_menu.addAction(diag_toggle)
+
+    # ---- Pane accessors (PR-C, tests) --------------------------------
+
+    def a2l_tree(self) -> A2LTreeView:
+        return self._a2l_tree
+
+    def plot_pane(self) -> PlotPane:
+        return self._plot_pane
+
+    def diagnostics_pane(self) -> DiagnosticsPane:
+        return self._diagnostics_pane
+
+    def a2l_dock(self) -> QDockWidget:
+        return self._a2l_dock
+
+    def diagnostics_dock(self) -> QDockWidget:
+        return self._diagnostics_dock
 
     # ---- State mutators (called by PR-B / PR-C panels and tests) ------
 
@@ -253,6 +304,12 @@ class MainWindow(QMainWindow):
             msg = f"gap count must be non-negative, got {count}"
             raise ValueError(msg)
         self._status_gap_count.setText(f"Gaps: {count}")
+
+    def record_daq_gap(self, at_seconds: float) -> None:
+        """Record a DAQ_GAP event: draws a marker, bumps diagnostics + status."""
+        self._plot_pane.mark_gap(at_seconds)
+        self._diagnostics_pane.increment_gap_event()
+        self.set_gap_count(self._diagnostics_pane.gap_events())
 
     def status_labels(self) -> tuple[QLabel, QLabel, QLabel]:
         """Test hook — returns (connection, daq_rate, gap_count) labels."""
