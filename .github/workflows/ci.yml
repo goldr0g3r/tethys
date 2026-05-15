@@ -9,6 +9,9 @@ name: ci
 #
 # Status: scaffolded. Most matrix entries pass trivially because Phase-1+ code has not landed yet.
 # Phase-1 (master pinning + slave foundation) engages real builds.
+#
+# Single umbrella job `build` (at bottom) aggregates the matrix legs so branch
+# protection can require one canonical context per parent §6.7.
 
 on:
   push:
@@ -35,13 +38,13 @@ jobs:
       - name: uv sync
         run: uv sync --no-progress
       - name: ruff
-        run: uv run ruff check . || echo "ruff: no rules configured yet (PR-5)"
+        run: 'uv run ruff check . || echo "ruff scaffolded - no rules configured yet (Phase-1)"'
         continue-on-error: true
       - name: mypy
-        run: uv run mypy . || echo "mypy: no rules configured yet (PR-5)"
+        run: 'uv run mypy . || echo "mypy scaffolded - no rules configured yet (Phase-1)"'
         continue-on-error: true
       - name: pytest
-        run: uv run pytest --tb=short || echo "pytest: no tests yet (Phase-1)"
+        run: 'uv run pytest --tb=short || echo "pytest scaffolded - no tests yet (Phase-1)"'
 
   simulator:
     name: simulator
@@ -53,8 +56,8 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
       - run: uv sync --no-progress
-      - run: uv run ruff check . || true
-      - run: uv run pytest --tb=short || echo "pytest: no tests yet"
+      - run: 'uv run ruff check . || true'
+      - run: 'uv run pytest --tb=short || echo "pytest scaffolded - no tests yet"'
 
   slave-posix:
     name: slave / posix
@@ -68,7 +71,7 @@ jobs:
       - name: CMake build
         run: cd slave && cmake --build --preset=dev
       - name: CTest
-        run: cd slave && ctest --preset=dev --output-on-failure || echo "ctest: cmake-init test stub only; PR-1a Ceedling expands"
+        run: 'cd slave && ctest --preset=dev --output-on-failure || echo "ctest scaffolded - Ceedling tests under slave/tests/ run via Ruby (PR-1a)"'
 
   slave-stm32:
     name: slave / stm32 (cross-compile)
@@ -82,5 +85,22 @@ jobs:
       - name: Cross-compile placeholder
         run: |
           echo "STM32 cross-compile placeholder."
-          echo "Phase-7 (marine STM32F4/F7) lands the real cmake toolchain file at slave/cmake/arm-none-eabi.cmake"
-          echo "and per-MCU presets. Until then this job verifies the toolchain installs cleanly."
+          echo "Phase-7 (marine STM32F4/F7) lands the real cmake toolchain file"
+          echo "at slave/cmake/arm-none-eabi.cmake and per-MCU presets."
+          echo "Until then this job verifies the toolchain installs cleanly."
+
+  # Single umbrella job whose ID maps to the parent §6.7 protection context "build".
+  # Required-status-check on `build` waits for all four matrix legs above to finish.
+  build:
+    name: build (summary)
+    runs-on: ubuntu-latest
+    needs: [master, simulator, slave-posix, slave-stm32]
+    if: always()
+    steps:
+      - name: Aggregate matrix result
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::One or more matrix legs failed"
+            exit 1
+          fi
+          echo "All ci.yml matrix legs passed."
