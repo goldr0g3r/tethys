@@ -236,11 +236,10 @@ async def test_conformance_drop_detection(factory: TransportFactory) -> None:
     """Loss is observable via the registered event callback.
 
     The loopback transport injects loss synthetically; SocketCAN observes
-    loss via kernel error frames which we cannot fabricate reliably in
-    test, so non-loopback cells skip the assertion but verify the
-    callback setter accepts a callable (i.e. the wiring exists). UART can
-    in principle inject framing errors but doing that reliably belongs in
-    PR-C's matrix expansion.
+    loss via kernel error frames; UART observes loss via the framer
+    state-machine when bytes are corrupted on the wire. The conformance
+    contract here asserts only that the callback wiring is in place;
+    actual real-bus fault injection is Phase 10 robustness-suite work.
     """
     _maybe_skip_unavailable(factory)
     captured: list[TransportEventKind] = []
@@ -254,3 +253,55 @@ async def test_conformance_drop_detection(factory: TransportFactory) -> None:
             assert captured == [TransportEventKind.LOSS]
         else:
             assert captured == []
+
+
+@pytest.mark.parametrize("factory", TRANSPORTS, ids=_id_of)
+@pytest.mark.asyncio
+async def test_conformance_burst_send_no_loss(factory: TransportFactory) -> None:
+    """A short burst within the transport's max_burst_loss budget arrives intact.
+
+    Asserts the contract from ADR-0010: each transport declares a
+    ``max_burst_loss`` that the ODT engine sizes buffers from. The
+    conformance suite verifies that a burst of size <= ``max_burst_loss``
+    (or 4 frames, whichever is smaller) round-trips losslessly.
+    """
+    _maybe_skip_unavailable(factory)
+    async with factory.setup() as (a, b):
+        burst_size = min(max(a.info.max_burst_loss, 1), 4)
+        payloads = [bytes([i]) * 4 for i in range(burst_size)]
+        for p in payloads:
+            await a.send(p)
+        for expected in payloads:
+            got = await b.recv(timeout=2.0)
+            assert got == expected, f"burst loss: expected {expected!r}, got {got!r}"
+
+
+@pytest.mark.parametrize("factory", TRANSPORTS, ids=_id_of)
+@pytest.mark.asyncio
+async def test_conformance_send_at_mtu_round_trip(factory: TransportFactory) -> None:
+    """An exactly-MTU-sized payload survives the round trip.
+
+    Catches off-by-one buffer sizing in the framer / ring code.
+    """
+    _maybe_skip_unavailable(factory)
+    async with factory.setup() as (a, b):
+        mtu = a.info.mtu
+        if mtu == 0:
+            pytest.skip("transport reports zero MTU")
+        # Repeating 0..255 ramp truncated to exactly MTU bytes.
+        payload = bytes((i & 0xFF) for i in range(mtu))
+        assert len(payload) == mtu
+        await a.send(payload)
+        got = await b.recv(timeout=2.0)
+        assert got == payload
+
+
+@pytest.mark.parametrize("factory", TRANSPORTS, ids=_id_of)
+@pytest.mark.asyncio
+async def test_conformance_send_oversize_raises(factory: TransportFactory) -> None:
+    """Sending more than ``info.mtu`` bytes raises ``ValueError`` consistently."""
+    _maybe_skip_unavailable(factory)
+    async with factory.setup() as (a, _b):
+        oversize = b"\x00" * (a.info.mtu + 1)
+        with pytest.raises(ValueError):
+            await a.send(oversize)
