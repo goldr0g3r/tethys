@@ -1,0 +1,85 @@
+---
+# Tethys project-wide clang-tidy baseline.
+# Cite: parent plan section 6.7 (CI gate matrix - static-analysis.yml).
+# Cite: ADR-0003 (MISRA C:2023 as the coding gate) - clang-tidy complements
+#       cppcheck-misra for CERT C and bugprone coverage.
+# Trace: docs/coding-standard.md - banned constructs aligned with check choices.
+#
+# slave/.clang-tidy (cmake-init default) overrides this file inside slave/ via
+# clang-tidy's nearest-config rule. The two are kept in sync conceptually
+# (rule-level disables documented in docs/coding-standard.md).
+
+Checks: >
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  misc-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -cert-err33-c,
+  -misc-include-cleaner,
+  -misc-no-recursion,
+  -misc-non-private-member-variables-in-classes,
+  -readability-function-cognitive-complexity,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-redundant-access-specifiers,
+  -readability-redundant-inline-specifier
+
+# Treat every active check as an error - parent plan section 6.7 mandates
+# "zero new warnings" on static-analysis.yml.
+WarningsAsErrors: '*'
+
+# Scope the linter to our own headers only. Third-party headers that arrive via
+# FetchContent (Unity, Ceedling-emitted, libFuzzer, etc.) are out of scope.
+HeaderFilterRegex: '^.*/(slave|master|simulator)/(include|src|source)/.*\.(h|hpp)$'
+
+# Configure individual checks where defaults are too noisy.
+CheckOptions:
+  - key: readability-function-size.LineThreshold
+    value: '120'
+  - key: readability-function-size.StatementThreshold
+    value: '60'
+  - key: readability-function-size.BranchThreshold
+    value: '20'
+  - key: readability-function-size.ParameterThreshold
+    value: '6'
+  - key: readability-function-size.NestingThreshold
+    value: '5'
+  - key: bugprone-suspicious-include.HeaderFileExtensions
+    value: ';h;hh;hpp;hxx'
+  - key: bugprone-suspicious-include.ImplementationFileExtensions
+    value: 'c;cc;cpp;cxx'
+  - key: cert-dcl37-c.AllowedIdentifiers
+    value: ''
+  - key: cert-dcl51-cpp.AllowedIdentifiers
+    value: ''
+  - key: readability-identifier-naming.MacroDefinitionCase
+    value: UPPER_CASE
+  - key: readability-identifier-naming.MacroDefinitionPrefix
+    value: 'TETHYS_'
+  - key: readability-identifier-naming.MacroDefinitionIgnoredRegexp
+    value: '(_H|_H_|_HPP|__)$'
+  - key: readability-identifier-naming.FunctionCase
+    value: lower_case
+  - key: readability-identifier-naming.VariableCase
+    value: lower_case
+  - key: readability-identifier-naming.TypedefCase
+    value: lower_case
+  - key: readability-identifier-naming.TypedefSuffix
+    value: '_t'
+  - key: readability-identifier-naming.StructCase
+    value: lower_case
+  - key: readability-identifier-naming.EnumCase
+    value: lower_case
+  - key: readability-identifier-naming.EnumConstantCase
+    value: UPPER_CASE
+
+# Run clang-format inside clang-tidy via `--fix-errors` invocations.
+FormatStyle: file
+
+# Inherit parent configuration if a directory ships its own .clang-tidy.
+InheritParentConfig: true
+...

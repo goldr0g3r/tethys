@@ -16,7 +16,7 @@ todos:
     status: completed
   - id: p0-coding-standards
     content: "Phase 0 / PR-5 chore(quality): .clang-format (LLVM base, 120 col), .clang-tidy (cert-*, bugprone-*, performance-*, readability-*), .editorconfig, cppcheck.cfg with MISRA addon ruleset, .gitattributes (LF normalisation), pre-commit hooks (clang-format, ruff, yamllint, markdownlint, codespell), docs/coding-standard.md (naming, header guards, banned constructs, MISRA deviation procedure)."
-    status: pending
+    status: completed
   - id: p0-runbooks
     content: "Phase 0 / PR-6 docs(runbook): docs/runbooks/{release-process,hardware-setup-stm32,hil-bench-setup,traceability-matrix-maintenance,incident-and-defect,supply-chain-and-sbom,demo-recording}.md + docs/runbooks/README.md index. Each runbook is a step-by-step recipe an external engineer could execute without further context."
     status: pending

@@ -1,0 +1,100 @@
+---
+# Tethys project-wide clang-format baseline.
+# Cite: parent plan section 6.7 (CI/CD gate matrix - coding-standards).
+# Cite: ADR-0003 (MISRA C:2023 as the coding gate) - coding style anchor.
+# Trace: docs/coding-standard.md - naming, header guards, banned constructs.
+#
+# slave/.clang-format (cmake-init default, 80-col, IndentWidth 2) overrides this
+# file inside slave/ via clang-format's nearest-config rule. Master / simulator /
+# tests / any C/C++ added at the repo root or under master|simulator inherit this
+# configuration.
+
+BasedOnStyle: LLVM
+Language: Cpp
+Standard: c++17
+
+# Layout
+ColumnLimit: 120
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+
+# Pointers / references
+PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+# Includes
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"tethys/'
+    Priority: 1
+  - Regex: '^<.*\.h>'
+    Priority: 2
+  - Regex: '^<.*>'
+    Priority: 3
+  - Regex: '.*'
+    Priority: 4
+
+# Braces / wrapping
+BreakBeforeBraces: Custom
+BraceWrapping:
+  AfterClass: false
+  AfterControlStatement: MultiLine
+  AfterEnum: false
+  AfterFunction: true
+  AfterNamespace: false
+  AfterStruct: false
+  AfterUnion: false
+  BeforeCatch: false
+  BeforeElse: false
+  IndentBraces: false
+  SplitEmptyFunction: false
+  SplitEmptyRecord: false
+  SplitEmptyNamespace: false
+
+# Function parameter packing
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+# Readability
+AlignConsecutiveAssignments: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: AcrossEmptyLinesAndComments
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 0
+
+# Spacing
+SpaceAfterCStyleCast: false
+SpaceAfterLogicalNot: false
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 2
+
+# Comments / strings
+ReflowComments: true
+BreakStringLiterals: false
+
+# Misc - tighten MISRA-friendly habits
+AllowShortBlocksOnASingleLine: Never
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: None
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+InsertBraces: true
+InsertNewlineAtEOF: true
+KeepEmptyLinesAtTheStartOfBlocks: false
+MaxEmptyLinesToKeep: 1
+SeparateDefinitionBlocks: Always
+
+# Line endings - LF everywhere per .gitattributes
+LineEnding: LF
+...

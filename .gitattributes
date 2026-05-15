@@ -1,0 +1,88 @@
+# Tethys repository attributes.
+# Cite: git attributes - https://git-scm.com/docs/gitattributes
+# Trace: docs/coding-standard.md - LF normalisation policy.
+#
+# Goals:
+#   1. Force LF endings on all text files in the repo.
+#   2. Mark binary asset types explicitly.
+#   3. Preserve CRLF for Windows-only scripts (.ps1 / .bat / .cmd) so PowerShell
+#      keeps working when files are checked out by Windows-native tooling.
+
+* text=auto eol=lf
+
+# Source code - text + LF
+*.c               text eol=lf
+*.cc              text eol=lf
+*.cpp             text eol=lf
+*.cxx             text eol=lf
+*.h               text eol=lf
+*.hh              text eol=lf
+*.hpp             text eol=lf
+*.hxx             text eol=lf
+*.py              text eol=lf
+*.pyi             text eol=lf
+*.ts              text eol=lf
+*.tsx             text eol=lf
+*.js              text eol=lf
+
+# Build + config - text + LF
+*.cmake           text eol=lf
+CMakeLists.txt    text eol=lf
+Makefile          text eol=lf
+*.mk              text eol=lf
+*.toml            text eol=lf
+*.yml             text eol=lf
+*.yaml            text eol=lf
+*.json            text eol=lf
+*.xml             text eol=lf
+*.ini             text eol=lf
+*.cfg             text eol=lf
+*.lock            text eol=lf
+
+# Markdown / docs - text + LF (markdown line-breaks via two trailing spaces).
+*.md              text eol=lf
+*.rst             text eol=lf
+*.txt             text eol=lf
+
+# Shell / Windows scripts - explicit per-platform endings
+*.sh              text eol=lf
+*.bash            text eol=lf
+*.ps1             text eol=crlf
+*.bat             text eol=crlf
+*.cmd             text eol=crlf
+
+# Diff-friendly text
+*.csv             text eol=lf
+*.tsv             text eol=lf
+
+# Binary assets - mark explicitly to keep git from line-ending mangling.
+*.png             binary
+*.jpg             binary
+*.jpeg            binary
+*.gif             binary
+*.svg             text eol=lf
+*.pdf             binary
+*.zip             binary
+*.gz              binary
+*.tgz             binary
+*.tar             binary
+*.bin             binary
+*.hex             binary
+*.elf             binary
+*.exe             binary
+*.dll             binary
+*.so              binary
+*.dylib           binary
+*.a               binary
+*.lib             binary
+*.o               binary
+*.obj             binary
+*.mdf             binary
+*.mdf4            binary
+# A2L files are ASCII per ASAM MCD-2 MC; keep text so diff works.
+*.a2l             text eol=lf
+
+# Lock files - prevent git from running line-ending normalisation noise.
+uv.lock           text eol=lf -diff
+package-lock.json text eol=lf -diff
+pnpm-lock.yaml    text eol=lf -diff

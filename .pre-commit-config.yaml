@@ -1,0 +1,104 @@
+# Tethys pre-commit hook configuration.
+# Cite: pre-commit framework - https://pre-commit.com/
+# Cite: parent plan section 6.7 (CI/CD gate matrix - the same hooks run in CI).
+# Cite: .cursor/rules/version-pinning.mdc - every revision is a commit SHA with
+#       the matching tag in the trailing comment.
+# Trace: docs/coding-standard.md sections 2 + 5 + 6.
+#
+# Local install:  uv tool install pre-commit && pre-commit install
+# Local run:      pre-commit run --all-files
+#
+# CI: the matching hook set runs in static-analysis.yml / misra-gate.yml so
+# every commit is checked twice (locally + in CI).
+
+minimum_pre_commit_version: "3.6.0"
+default_language_version:
+  python: python3.11
+default_stages: [pre-commit]
+
+# Hooks excluded by default for the entire run; per-hook overrides re-enable
+# where appropriate.
+exclude: |
+  (?x)^(
+      slave/build/.*
+      | slave/cmake-build-.*/.*
+      | build/.*
+      | cmake-build-.*/.*
+      | \.venv/.*
+      | node_modules/.*
+      | .*\.svg
+      | .*\.pdf
+      | .*\.bin
+      | .*\.hex
+      | .*\.elf
+      | .*\.mdf
+      | .*\.mdf4
+  )$
+
+repos:
+  # General hygiene hooks (whitespace, large files, syntax sanity).
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--unsafe]  # docs-render.yml uses GitHub Actions custom tags
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1024]
+      - id: check-case-conflict
+      - id: check-symlinks
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        exclude: \.(ps1|bat|cmd)$
+
+  # C / C++ formatting - matches root .clang-format.
+  - repo: https://github.com/pre-commit/mirrors-clang-format
+    rev: fed9a1f62c22af0bc846a260ebfeb0844368fd93  # v19.1.4
+    hooks:
+      - id: clang-format
+        types_or: [c, c++]
+        files: \.(c|cc|cpp|cxx|h|hh|hpp|hxx)$
+
+  # Python formatting + lint - covers master/, simulator/, scripts/, hil/.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: cafecb2f683a620516412e109877570ca7648cbd  # v0.7.4
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+      - id: ruff-format
+
+  # YAML lint - covers .github/workflows/ and any config YAML.
+  - repo: https://github.com/adrienverge/yamllint
+    rev: 81e9f98ffd059efe8aa9c1b1a42e5cce61b640c6  # v1.35.1
+    hooks:
+      - id: yamllint
+        args: [--strict, --config-file=.yamllint.yaml]
+
+  # Markdown lint - matches .markdownlint.json at repo root.
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: aa975a18c9a869648007d33864034dbc7481fe5e  # v0.42.0
+    hooks:
+      - id: markdownlint
+        args: [--config=.markdownlint.json]
+        exclude: |
+          (?x)^(
+              \.github/.*
+              | docs/research/.*
+          )$
+
+  # Spell-check English prose. .codespellrc lives in slave/ (cmake-init default)
+  # and is consulted; project-wide skip list lives in this hook config.
+  - repo: https://github.com/codespell-project/codespell
+    rev: 193cd7d27cd571f79358af09a8fb8997e54f8fff  # v2.3.0
+    hooks:
+      - id: codespell
+        args:
+          - --ignore-words-list=tethys,nd,te,unx,iif,fo,doubleCheck,assertIn,wnP,inout,thirdParty,parm,parms,creat,fpr,od
+          - --skip=*.svg,*.pdf,*.lock,*.json,docs/research/*,terminals/*,.git/*,node_modules/*,slave/build/*,build/*
+          - --quiet-level=3

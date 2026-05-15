@@ -1,0 +1,68 @@
+# Tethys project-wide editor baseline.
+# Cite: EditorConfig spec - https://editorconfig.org/
+# Trace: docs/coding-standard.md - formatting baseline.
+#
+# Cascades into every editor / IDE / pre-commit hook. Per-extension overrides
+# below; nearest-match wins.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+tab_width = 4
+trim_trailing_whitespace = true
+insert_final_newline = true
+max_line_length = 120
+
+# C / C++ - matches root .clang-format (slave/.clang-format uses IndentWidth 2
+# but cascades there via its own .editorconfig if added later).
+[*.{c,cc,cpp,cxx,h,hh,hpp,hxx}]
+indent_size = 4
+tab_width = 4
+
+# Python - ruff-friendly.
+[*.{py,pyi}]
+indent_size = 4
+tab_width = 4
+
+# Web/data formats.
+[*.{yml,yaml,json,toml}]
+indent_size = 2
+tab_width = 2
+
+# CMake.
+[CMakeLists.txt]
+indent_size = 2
+tab_width = 2
+[*.cmake]
+indent_size = 2
+tab_width = 2
+
+# Markdown - hard-wrap at 120 chars but allow trailing-whitespace for line
+# breaks (markdownlint MD009 already configured permissively in
+# .markdownlint.json).
+[*.md]
+indent_size = 2
+tab_width = 2
+trim_trailing_whitespace = false
+
+# Windows scripts use CRLF per .gitattributes.
+[*.{ps1,bat,cmd}]
+end_of_line = crlf
+
+# Makefiles require literal tabs.
+[Makefile]
+indent_style = tab
+tab_width = 4
+
+# Git-managed test fixtures (binary or otherwise opaque) - leave alone.
+[*.{a2l,mdf,mdf4,bin,hex,elf}]
+charset = unset
+end_of_line = unset
+indent_style = unset
+indent_size = unset
+trim_trailing_whitespace = unset
+insert_final_newline = unset

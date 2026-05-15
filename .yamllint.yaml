@@ -1,0 +1,33 @@
+# Tethys yamllint config.
+# Cite: yamllint docs - https://yamllint.readthedocs.io/
+# Trace: docs/coding-standard.md - YAML formatting baseline.
+
+extends: default
+
+rules:
+  line-length:
+    max: 200
+    level: warning
+  document-start:
+    present: false
+  truthy:
+    # GitHub Actions uses `on:` as a key, allow without quotes.
+    allowed-values: ["true", "false", "on", "off", "yes", "no"]
+    check-keys: false
+  comments:
+    # pre-commit autofix sometimes leaves single-# inline comments.
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+  braces:
+    max-spaces-inside: 1
+    level: error
+
+ignore: |
+  node_modules/
+  .venv/
+  build/
+  slave/build/
+  cmake-build-*/

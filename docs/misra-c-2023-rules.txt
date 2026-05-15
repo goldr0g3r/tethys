@@ -1,0 +1,219 @@
+# MISRA C:2023 rule-text index (Tethys)
+#
+# Format: cppcheck `--rule-texts=<file>` consumes one rule per line:
+#   <id> <short-text>
+#
+# The canonical rule text is in the official MISRA C:2023 document published by
+# the MISRA consortium (https://www.misra.org.uk/). This file is a one-line
+# index keyed to the cppcheck-misra addon output so the misra-gate workflow
+# produces readable diagnostics; it is NOT a substitute for the official
+# guidelines.
+#
+# Tier mnemonics:
+#   [M] = Mandatory (zero deviations, ever)
+#   [R] = Required  (deviations require an entry in docs/misra-deviations.md)
+#   [A] = Advisory  (deviations logged; not blocking)
+#
+# Cite: MISRA C:2023 (https://www.misra.org.uk/)
+# Cite: cppcheck-misra addon (https://cppcheck.sourceforge.io/manual.html section "MISRA")
+# Cite: ADR-0003 (MISRA C:2023 as the coding gate)
+# Trace: docs/misra-deviations.md (deviation register)
+
+# --- Directives ---
+1.1  [R]  All code shall be compliant with C11 - any extensions documented.
+1.2  [A]  Language extensions should not be used.
+1.3  [M]  No undefined or critical unspecified behaviour shall occur.
+2.1  [R]  Assembly language shall be encapsulated and isolated.
+2.2  [R]  Sections of code should not be commented out.
+3.1  [R]  All source files shall compile without errors.
+4.1  [R]  Run-time failures shall be minimised.
+4.2  [A]  All non-trivial source code shall be traceable to a requirement.
+4.3  [A]  Single coding style should be used.
+4.4  [A]  Sections of code should not be commented out (Directive 4.4 in 2023 redraft).
+4.5  [A]  Identifiers in the same name space and scope shall be distinct.
+4.6  [A]  typedefs that indicate size and signedness should be used.
+4.7  [R]  If a function returns error information then that information shall be tested.
+4.8  [A]  Definition of an object/function shall be hidden when only an opaque pointer is shared.
+4.9  [A]  A function should be used in preference to a function-like macro.
+4.10 [R]  Precautions shall be taken to prevent inclusion of a header file more than once.
+4.11 [R]  The validity of arguments to a function shall be checked.
+4.12 [R]  Dynamic memory allocation shall not be used (Tethys: enforced by no-dynamic-allocation rule).
+4.13 [A]  Functions which produce side-effects should not be used as resource handles in inappropriate places.
+4.14 [R]  The validity of values received from external sources shall be checked.
+
+# --- Rules: Implementation ---
+1.1.r [M]  The program shall not contain unreachable code (cppcheck id misra-c2012-2.1 / 2023 equivalent).
+1.2.r [A]  Sections of code should not be commented out.
+1.3.r [R]  All `extern` declarations shall be the same throughout the program.
+
+# --- Rules: Compilation and build ---
+3.1.r [M]  The character sequences `/*` and `//` shall not be used within a comment.
+3.2.r [R]  Line-splicing shall not be used in `//` comments.
+
+# --- Rules: Identifiers ---
+5.1.r [R]  External identifiers shall be distinct.
+5.2.r [R]  Identifiers declared in the same scope and name space shall be distinct.
+5.3.r [R]  An identifier declared in an inner scope shall not hide an identifier in an outer scope.
+5.4.r [R]  Macro identifiers shall be distinct.
+5.5.r [R]  Identifiers shall be distinct from macro names.
+5.6.r [A]  A typedef name shall be a unique identifier.
+5.7.r [A]  A tag name shall be a unique identifier.
+5.8.r [R]  Identifiers that define objects or functions with external linkage shall be unique.
+5.9.r [A]  Identifiers that define objects or functions with internal linkage should be unique.
+
+# --- Rules: Types ---
+6.1.r [R]  Bit-fields shall only be declared with an appropriate type.
+6.2.r [R]  Single-bit named bit-fields shall not be of a signed type.
+
+# --- Rules: Literals and constants ---
+7.1.r [R]  Octal constants shall not be used.
+7.2.r [R]  A `u` or `U` suffix shall be applied to unsigned-integer constants.
+7.3.r [R]  The lowercase character `l` shall not be used in literal suffixes.
+7.4.r [R]  A string literal shall not be assigned to an object unless its type is `const char *`.
+
+# --- Rules: Declarations and definitions ---
+8.1.r [R]  Types shall be explicitly specified.
+8.2.r [R]  Function types shall be in prototype form with named parameters.
+8.3.r [R]  All declarations of an object or function shall use the same names and qualifiers.
+8.4.r [R]  A compatible declaration shall be visible when an object or function with external linkage is defined.
+8.5.r [R]  An external object or function shall be declared once in one and only one file.
+8.6.r [R]  An identifier with external linkage shall have exactly one external definition.
+8.7.r [A]  Functions and objects should not be defined with external linkage if they are referenced only in one translation unit.
+8.8.r [R]  The `static` storage-class specifier shall be used in all declarations of objects/functions that have internal linkage.
+8.9.r [A]  An object should be defined at block scope if its identifier only appears in a single function.
+8.10.r [R] An inline function shall be declared with the `static` storage class.
+8.11.r [A] When an array with external linkage is declared, its size should be explicitly specified.
+8.12.r [R] Within an enumerator list the value of an implicitly specified enumerator shall be unique.
+8.13.r [A] A pointer should point to a `const`-qualified type whenever possible.
+8.14.r [R] The `restrict` type qualifier shall not be used.
+
+# --- Rules: Initialisation ---
+9.1.r [M]  The value of an object with automatic storage duration shall not be read before it has been set.
+9.2.r [R]  The initialiser for an aggregate or union shall be enclosed in braces.
+9.3.r [R]  Arrays shall not be partially initialised.
+9.4.r [R]  An element of an object shall not be initialised more than once.
+9.5.r [R]  Where designated initialisers are used to initialise an array object the size of the array shall be specified explicitly.
+
+# --- Rules: Essential type model ---
+10.1.r [R] Operands shall not be of an inappropriate essential type.
+10.2.r [R] Expressions of essentially character type shall not be used inappropriately in addition and subtraction operations.
+10.3.r [R] The value of an expression shall not be assigned to an object with a narrower essential type or of a different essential type category.
+10.4.r [R] Both operands of an operator in which the usual arithmetic conversions are performed shall have the same essential type category.
+10.5.r [A] The value of an expression should not be cast to an inappropriate essential type.
+10.6.r [R] The value of a composite expression shall not be assigned to an object with wider essential type.
+10.7.r [R] If a composite expression is used as one operand of an operator in which the usual arithmetic conversions are performed then the other operand shall not have wider essential type.
+10.8.r [R] The value of a composite expression shall not be cast to a different essential type category or a wider essential type.
+
+# --- Rules: Pointer type conversions ---
+11.1.r [R] Conversions shall not be performed between a pointer to a function and any other type.
+11.2.r [R] Conversions shall not be performed between a pointer to an incomplete type and any other type.
+11.3.r [R] A cast shall not be performed between a pointer to object type and a pointer to a different object type.
+11.4.r [A] A conversion should not be performed between a pointer to object and an integer type.
+11.5.r [A] A conversion should not be performed from pointer to void into pointer to object.
+11.6.r [R] A cast shall not be performed between pointer to void and an arithmetic type.
+11.7.r [R] A cast shall not be performed between pointer to object and a non-integer arithmetic type.
+11.8.r [R] A cast shall not remove any `const`, `volatile` or `_Atomic` qualification from the type pointed to by a pointer.
+11.9.r [R] The macro `NULL` shall be the only permitted form of integer null pointer constant.
+
+# --- Rules: Expressions ---
+12.1.r [A] The precedence of operators within expressions should be made explicit.
+12.2.r [R] The right-hand operand of a shift operator shall lie in the range zero to one less than the width in bits of the essential type of the left-hand operand.
+12.3.r [A] The comma operator should not be used.
+12.4.r [A] Evaluation of constant expressions should not lead to unsigned integer wrap-around.
+12.5.r [M] The `sizeof` operator shall not have an operand which is a function parameter declared as "array of type".
+
+# --- Rules: Side-effects ---
+13.1.r [R] Initialiser lists shall not contain persistent side-effects.
+13.2.r [R] The value of an expression and its persistent side-effects shall be the same under all permitted evaluation orders.
+13.3.r [A] A full expression containing an increment (++) or decrement (--) operator should have no other potential side-effects other than that caused by the increment or decrement.
+13.4.r [A] The result of an assignment operator should not be used.
+13.5.r [R] The right-hand operand of a logical && or || operator shall not contain persistent side-effects.
+13.6.r [M] The operand of the `sizeof` operator shall not contain any expression which has potential side-effects.
+
+# --- Rules: Control statement expressions ---
+14.1.r [R] A loop counter shall not have essentially floating type.
+14.2.r [R] A for-loop shall be well-formed.
+14.3.r [R] Controlling expressions shall not be invariant.
+14.4.r [R] The controlling expression of an if-statement and the controlling expression of an iteration-statement shall have essentially Boolean type.
+
+# --- Rules: Control flow ---
+15.1.r [A] The `goto` statement should not be used (Tethys: enforced by no-recursion-no-goto rule).
+15.2.r [R] The `goto` statement shall jump to a label declared later in the same function.
+15.3.r [R] Any label referenced by a `goto` statement shall be declared in the same block, or in any block enclosing the `goto` statement.
+15.4.r [A] There should be no more than one `break` or `goto` statement used to terminate any iteration statement.
+15.5.r [A] A function should have a single point of exit at the end.
+15.6.r [R] The body of an iteration-statement or a selection-statement shall be a compound-statement.
+15.7.r [R] All if/else-if constructs shall be terminated with an `else` statement.
+
+# --- Rules: Switch statements ---
+16.1.r [R] All switch statements shall be well-formed.
+16.2.r [R] A switch label shall only be used when the most closely-enclosing compound statement is the body of a switch statement.
+16.3.r [R] An unconditional `break` statement shall terminate every switch-clause.
+16.4.r [R] Every switch statement shall have a `default` label.
+16.5.r [R] A `default` label shall appear as either the first or the last switch label of a switch statement.
+16.6.r [R] Every switch statement shall have at least two switch-clauses.
+16.7.r [R] A switch-expression shall not have essentially Boolean type.
+
+# --- Rules: Functions ---
+17.1.r [R] The features of <stdarg.h> shall not be used.
+17.2.r [R] Functions shall not call themselves, either directly or indirectly (Tethys: no-recursion-no-goto rule reinforces).
+17.3.r [M] A function shall not be declared implicitly.
+17.4.r [M] All exit paths from a function with non-void return type shall have an explicit return statement with an expression.
+17.5.r [A] The function argument corresponding to a parameter declared to have an array type shall have an appropriate number of elements.
+17.6.r [M] The declaration of an array parameter shall not contain the `static` keyword between the [].
+17.7.r [R] The value returned by a function having non-void return type shall be used.
+17.8.r [A] A function parameter should not be modified.
+
+# --- Rules: Pointers and arrays ---
+18.1.r [R] A pointer resulting from arithmetic on a pointer operand shall address an element of the same array as that pointer operand.
+18.2.r [R] Subtraction between pointers shall only be applied to pointers that address elements of the same array.
+18.3.r [R] The relational operators >, >=, < and <= shall not be applied to objects of pointer type except where they point into the same object.
+18.4.r [A] The +, -, += and -= operators should not be applied to an expression of pointer type.
+18.5.r [A] Declarations should contain no more than two levels of pointer nesting.
+18.6.r [R] The address of an object with automatic or thread storage duration shall not be copied to another object that persists after the first object has ceased to exist.
+18.7.r [R] Flexible array members shall not be declared.
+18.8.r [R] Variable-length array (VLA) types shall not be used (Tethys: also banned by no-dynamic-allocation rule).
+
+# --- Rules: Overlapping storage ---
+19.1.r [M] An object shall not be assigned or copied to an overlapping object.
+19.2.r [A] The `union` keyword should not be used.
+
+# --- Rules: Preprocessing directives ---
+20.1.r [A] #include directives should only be preceded by preprocessor directives or comments.
+20.2.r [R] The ', " or \ characters and the /* or // character sequences shall not occur in a header file name.
+20.3.r [R] The `#include` directive shall be followed by either a <filename> or "filename" sequence.
+20.4.r [R] A macro shall not be defined with the same name as a keyword.
+20.5.r [A] #undef should not be used.
+20.6.r [R] Tokens that look like a preprocessing directive shall not occur within a macro argument.
+20.7.r [R] Expressions resulting from the expansion of macro parameters shall be enclosed in parentheses.
+20.8.r [R] The controlling expression of a #if or #elif preprocessing directive shall evaluate to 0 or 1.
+20.9.r [R] All identifiers used in the controlling expression of #if or #elif preprocessing directives shall be #define'd before evaluation.
+20.10.r [A] The # and ## preprocessor operators should not be used.
+20.11.r [R] A macro parameter immediately following a # operator shall not immediately be followed by a ## operator.
+20.12.r [R] A macro parameter used as an operand to the # or ## operators, which is itself subject to further macro replacement, shall only be used as an operand to these operators.
+20.13.r [R] A line whose first token is # shall be a valid preprocessing directive.
+20.14.r [R] All #else, #elif and #endif preprocessor directives shall reside in the same file as the #if, #ifdef or #ifndef directive to which they are related.
+
+# --- Rules: Standard libraries ---
+21.1.r [R] #define and #undef shall not be used on a reserved identifier or reserved macro name.
+21.2.r [R] A reserved identifier or reserved macro name shall not be declared.
+21.3.r [R] The memory allocation and deallocation functions of <stdlib.h> shall not be used (Tethys: also banned by no-dynamic-allocation rule).
+21.4.r [R] The standard header file <setjmp.h> shall not be used.
+21.5.r [R] The standard header file <signal.h> shall not be used.
+21.6.r [R] The Standard Library input/output functions shall not be used.
+21.7.r [R] The atof, atoi, atol and atoll functions of <stdlib.h> shall not be used.
+21.8.r [R] The library functions abort, exit, getenv and system of <stdlib.h> shall not be used.
+21.9.r [R] The library functions bsearch and qsort of <stdlib.h> shall not be used.
+21.10.r [R] The Standard Library time and date functions shall not be used.
+21.11.r [R] The standard header file <tgmath.h> shall not be used.
+21.12.r [A] The exception handling features of <fenv.h> should not be used.
+
+# --- Rules: Resources ---
+22.1.r [R] All resources obtained dynamically by means of Standard Library functions shall be explicitly released.
+22.2.r [M] A block of memory shall only be freed if it was allocated by means of a Standard Library function.
+22.3.r [R] The same file shall not be open for read and write access at the same time on different streams.
+22.4.r [M] There shall be no attempt to write to a stream which has been opened as read-only.
+22.5.r [M] A pointer to a FILE object shall not be dereferenced.
+22.6.r [M] The value of a pointer to a FILE shall not be used after the associated stream has been closed.
+
+# --- End of index ---
