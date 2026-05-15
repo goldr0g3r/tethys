@@ -1,0 +1,184 @@
+"""MainWindow tests: signals, status bar mutators, action enablement.
+
+Drives every menu / toolbar action and every status mutator to satisfy
+the Phase 6 acceptance criterion ("all critical actions reachable;
+smoke test runs headless in CI via pytest-qt").
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+import pytest
+
+pytest.importorskip("PySide6", reason="PySide6 not installed; run `uv sync --all-extras`.")
+pytest.importorskip("pytestqt", reason="pytest-qt not installed; run `uv sync --all-extras`.")
+
+# E402: pytest.importorskip MUST run before any PySide6 import so the suite
+# skips cleanly in headless-CLI-only checkouts. The `noqa` is intentional.
+from PySide6.QtCore import Qt  # noqa: E402
+from PySide6.QtWidgets import QApplication, QToolBar  # noqa: E402
+
+from tethys_master.gui.main_window import MainWindow  # noqa: E402
+
+if TYPE_CHECKING:
+    from pytestqt.qtbot import QtBot
+
+pytestmark = pytest.mark.gui
+
+
+@pytest.fixture
+def window(qtbot: QtBot) -> MainWindow:
+    win = MainWindow()
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+    return win
+
+
+def test_main_window_title_includes_version_and_xcp_marker(window: MainWindow) -> None:
+    title = window.windowTitle()
+    assert "Tethys master" in title
+    assert "XCP 1.4" in title
+
+
+def test_menus_present_and_named(window: MainWindow) -> None:
+    menu_bar = window.menuBar()
+    assert menu_bar is not None
+    action_titles = [a.text().replace("&", "") for a in menu_bar.actions()]
+    for expected in ("File", "Connect", "View", "Help"):
+        assert expected in action_titles, f"menu bar missing {expected!r}; got {action_titles}"
+
+
+def test_toolbar_contains_all_critical_actions(window: MainWindow) -> None:
+    toolbars = window.findChildren(QToolBar)
+    main_toolbar = next(tb for tb in toolbars if tb.objectName() == "main_toolbar")
+    action_names = [a.objectName() for a in main_toolbar.actions() if a.objectName()]
+    for expected in (
+        "action_connect",
+        "action_disconnect",
+        "action_start_daq",
+        "action_stop_daq",
+        "action_record",
+    ):
+        assert expected in action_names, f"toolbar missing {expected!r}; got {action_names}"
+
+
+def test_status_bar_initially_disconnected_idle_no_gaps(window: MainWindow) -> None:
+    conn, daq, gaps = window.status_labels()
+    assert conn.text() == "Disconnected"
+    assert daq.text() == "DAQ: idle"
+    assert gaps.text() == "Gaps: 0"
+
+
+def test_disconnect_action_disabled_initially(window: MainWindow) -> None:
+    assert not window.action_disconnect.isEnabled()
+    assert not window.action_start_daq.isEnabled()
+    assert not window.action_stop_daq.isEnabled()
+    assert not window.action_record.isEnabled()
+    # Connect is always enabled.
+    assert window.action_connect.isEnabled()
+
+
+def test_set_connection_state_updates_status_and_enables_actions(window: MainWindow) -> None:
+    window.set_connection_state(connected=True, peer="udp://127.0.0.1:5555")
+    conn, _, _ = window.status_labels()
+    assert "udp://127.0.0.1:5555" in conn.text()
+    assert window.is_connected()
+    assert window.action_disconnect.isEnabled()
+    assert window.action_start_daq.isEnabled()  # DAQ not yet active
+    assert not window.action_stop_daq.isEnabled()
+    assert window.action_record.isEnabled()
+
+
+def test_set_connection_state_disconnect_resets_daq(window: MainWindow) -> None:
+    window.set_connection_state(connected=True, peer="udp://x")
+    window.set_daq_rate_hz(1000.0)
+    assert window.is_daq_active()
+    window.set_connection_state(connected=False)
+    assert not window.is_connected()
+    assert not window.is_daq_active()
+    _, daq, _ = window.status_labels()
+    assert daq.text() == "DAQ: idle"
+
+
+def test_set_daq_rate_hz_formats_and_toggles_actions(window: MainWindow) -> None:
+    window.set_connection_state(connected=True, peer="udp://x")
+    window.set_daq_rate_hz(1000.0)
+    _, daq, _ = window.status_labels()
+    assert daq.text() == "DAQ: 1000.0 Hz"
+    assert window.is_daq_active()
+    assert not window.action_start_daq.isEnabled()
+    assert window.action_stop_daq.isEnabled()
+    window.set_daq_rate_hz(None)
+    assert daq.text() == "DAQ: idle"
+    assert not window.is_daq_active()
+
+
+def test_set_gap_count_updates_label(window: MainWindow) -> None:
+    window.set_gap_count(7)
+    _, _, gaps = window.status_labels()
+    assert gaps.text() == "Gaps: 7"
+
+
+def test_set_gap_count_rejects_negative(window: MainWindow) -> None:
+    with pytest.raises(ValueError, match="non-negative"):
+        window.set_gap_count(-1)
+
+
+def test_connect_action_emits_signal_and_opens_wizard(qtbot: QtBot, window: MainWindow) -> None:
+    with qtbot.waitSignal(window.connect_requested, timeout=1000):
+        window.action_connect.trigger()
+    wizard = getattr(window, "_active_wizard", None)
+    assert wizard is not None, "Connect action did not stash an active wizard"
+    assert wizard.objectName() == "connection_wizard_modal"
+    wizard.close()
+
+
+def test_disconnect_start_stop_record_actions_emit_signals(qtbot: QtBot, window: MainWindow) -> None:
+    window.set_connection_state(connected=True, peer="udp://x")
+
+    with qtbot.waitSignal(window.disconnect_requested, timeout=1000):
+        window.action_disconnect.trigger()
+
+    with qtbot.waitSignal(window.start_daq_requested, timeout=1000):
+        window.action_start_daq.trigger()
+
+    window.set_daq_rate_hz(500.0)
+    with qtbot.waitSignal(window.stop_daq_requested, timeout=1000):
+        window.action_stop_daq.trigger()
+
+    with qtbot.waitSignal(window.record_mdf4_requested, timeout=1000):
+        window.action_record.trigger()
+
+
+def test_central_widget_placeholder_present(window: MainWindow) -> None:
+    central = window.centralWidget()
+    assert central is not None
+    assert central.objectName() == "central_placeholder"
+
+
+def test_show_about_dialog_does_not_crash(qtbot: QtBot, window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``QMessageBox.about`` is modal; we intercept it to keep the test non-blocking."""
+    from PySide6.QtWidgets import QMessageBox
+
+    invocations: list[str] = []
+
+    def _fake_about(*args: object, **kwargs: object) -> None:
+        invocations.append("about-called")
+
+    monkeypatch.setattr(QMessageBox, "about", staticmethod(_fake_about))
+    window.action_about.trigger()
+    qtbot.wait(50)
+    assert invocations == ["about-called"]
+
+
+def test_close_event_does_not_crash(qtbot: QtBot) -> None:
+    win = MainWindow()
+    qtbot.addWidget(win)
+    win.show()
+    qtbot.waitExposed(win)
+    win.close()
+    app = QApplication.instance()
+    assert app is not None
+    _ = Qt.Key.Key_F1  # touch Qt to ensure module is still importable
