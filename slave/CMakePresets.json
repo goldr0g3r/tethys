@@ -1,8 +1,8 @@
 {
-  "version": 2,
+  "version": 3,
   "cmakeMinimumRequired": {
     "major": 3,
-    "minor": 14,
+    "minor": 21,
     "patch": 0
   },
   "configurePresets": [
@@ -163,6 +163,49 @@
     {
       "name": "ci-windows",
       "inherits": ["ci-build", "ci-win64", "dev-mode", "ci-multi-config"]
+    },
+    {
+      "name": "cross-arm-base",
+      "description": "Common settings for any STM32 Cortex-M cross-compile preset",
+      "hidden": true,
+      "generator": "Ninja",
+      "toolchainFile": "${sourceDir}/cmake/arm-none-eabi.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "marine-stm32f4",
+      "description": "Marine profile, STM32F4 (Cortex-M4 + FPv4-SP single-precision FPU). NUCLEO-F411RE / F446RE / similar.",
+      "binaryDir": "${sourceDir}/build/marine-stm32f4",
+      "inherits": ["cross-arm-base"],
+      "cacheVariables": {
+        "TETHYS_PROFILE": "marine",
+        "TETHYS_PLATFORM": "stm32f4",
+        "TETHYS_MCU_FLAGS": "-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard -DSTM32F4 -DTETHYS_STM32_SYSCLK_HZ=168000000U"
+      }
+    },
+    {
+      "name": "marine-stm32f7",
+      "description": "Marine profile, STM32F7 (Cortex-M7 + FPv5 double-precision FPU). NUCLEO-F767ZI baseline (parent §7).",
+      "binaryDir": "${sourceDir}/build/marine-stm32f7",
+      "inherits": ["cross-arm-base"],
+      "cacheVariables": {
+        "TETHYS_PROFILE": "marine",
+        "TETHYS_PLATFORM": "stm32f7",
+        "TETHYS_MCU_FLAGS": "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -DSTM32F7 -DTETHYS_STM32_SYSCLK_HZ=216000000U"
+      }
+    },
+    {
+      "name": "space-stm32h7",
+      "description": "Space profile, STM32H7 (Cortex-M7 + FPv5-D + DTCM). NUCLEO-H753ZI baseline (parent §8).",
+      "binaryDir": "${sourceDir}/build/space-stm32h7",
+      "inherits": ["cross-arm-base"],
+      "cacheVariables": {
+        "TETHYS_PROFILE": "space",
+        "TETHYS_PLATFORM": "stm32h7",
+        "TETHYS_MCU_FLAGS": "-mcpu=cortex-m7 -mthumb -mfpu=fpv5-d16 -mfloat-abi=hard -DSTM32H7 -DTETHYS_STM32_SYSCLK_HZ=480000000U -DTETHYS_UART_PCLK_HZ=100000000U"
+      }
     }
   ],
   "buildPresets": [
@@ -182,6 +225,18 @@
     {
       "name": "ci-sanitize",
       "configurePreset": "ci-sanitize"
+    },
+    {
+      "name": "marine-stm32f4",
+      "configurePreset": "marine-stm32f4"
+    },
+    {
+      "name": "marine-stm32f7",
+      "configurePreset": "marine-stm32f7"
+    },
+    {
+      "name": "space-stm32h7",
+      "configurePreset": "space-stm32h7"
     }
   ],
   "testPresets": [

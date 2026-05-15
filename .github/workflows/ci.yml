@@ -86,20 +86,44 @@ jobs:
         run: 'cd slave && ctest --preset=dev --output-on-failure || echo "ctest scaffolded - Ceedling tests under slave/tests/ run via Ruby (PR-1a)"'
 
   slave-stm32:
+    # Phase-7 / Phase-8 foundation: cross-compile the slave library for
+    # STM32 Cortex-M targets (marine = F4 + F7; space = H7 lands in PR-B).
+    # Verifies the toolchain file + per-MCU presets + profile cmake on every
+    # PR. No flashing / no on-target tests; that needs physical Nucleo
+    # hardware and is covered by docs/runbooks/hardware-setup-stm32.md.
     name: slave / stm32 (cross-compile)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - preset: marine-stm32f4
+            label: marine-stm32f4
+          - preset: marine-stm32f7
+            label: marine-stm32f7
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Install cross toolchain
         run: sudo apt-get update && sudo apt-get install -y gcc-arm-none-eabi cmake ninja-build
       - name: Verify cross toolchain
         run: arm-none-eabi-gcc --version
-      - name: Cross-compile placeholder
+      - name: Configure (${{ matrix.preset }})
+        run: cd slave && cmake --preset=${{ matrix.preset }}
+      - name: Build (${{ matrix.preset }})
+        run: cd slave && cmake --build --preset=${{ matrix.preset }}
+      - name: Report static-library section sizes
         run: |
-          echo "STM32 cross-compile placeholder."
-          echo "Phase-7 (marine STM32F4/F7) lands the real cmake toolchain file"
-          echo "at slave/cmake/arm-none-eabi.cmake and per-MCU presets."
-          echo "Until then this job verifies the toolchain installs cleanly."
+          ARTEFACT="slave/build/${{ matrix.preset }}/libtethys_slave.a"
+          ls -la "${ARTEFACT}"
+          arm-none-eabi-size -A "${ARTEFACT}" | head -n 80
+          arm-none-eabi-size --totals "${ARTEFACT}" | tail -n 5
+      - name: Upload static library artefact
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: tethys-slave-${{ matrix.label }}
+          path: slave/build/${{ matrix.preset }}/libtethys_slave.a
+          if-no-files-found: error
+          retention-days: 7
 
   # Single umbrella job whose ID maps to the parent §6.7 protection context "build".
   # Required-status-check on `build` waits for all four matrix legs above to finish.
