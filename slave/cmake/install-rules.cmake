@@ -1,6 +1,6 @@
 if(PROJECT_IS_TOP_LEVEL)
   set(
-      CMAKE_INSTALL_INCLUDEDIR "include/slave-${PROJECT_VERSION}"
+      CMAKE_INSTALL_INCLUDEDIR "include/tethys-${PROJECT_VERSION}"
       CACHE STRING ""
   )
   set_property(CACHE CMAKE_INSTALL_INCLUDEDIR PROPERTY TYPE PATH)
@@ -10,26 +10,26 @@ include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
 
 # find_package(<package>) call for consumers to find this project
-set(package slave)
+set(package tethys)
 
 install(
     DIRECTORY
     include/
     "${PROJECT_BINARY_DIR}/export/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    COMPONENT slave_Development
+    COMPONENT tethys_Development
 )
 
 install(
-    TARGETS slave_slave
-    EXPORT slaveTargets
+    TARGETS tethys_slave
+    EXPORT tethysTargets
     RUNTIME #
-    COMPONENT slave_Runtime
+    COMPONENT tethys_Runtime
     LIBRARY #
-    COMPONENT slave_Runtime
-    NAMELINK_COMPONENT slave_Development
+    COMPONENT tethys_Runtime
+    NAMELINK_COMPONENT tethys_Development
     ARCHIVE #
-    COMPONENT slave_Development
+    COMPONENT tethys_Development
     INCLUDES #
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
@@ -41,30 +41,30 @@ write_basic_package_version_file(
 
 # Allow package maintainers to freely override the path for the configs
 set(
-    slave_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/${package}"
+    tethys_INSTALL_CMAKEDIR "${CMAKE_INSTALL_LIBDIR}/cmake/${package}"
     CACHE STRING "CMake package config location relative to the install prefix"
 )
-set_property(CACHE slave_INSTALL_CMAKEDIR PROPERTY TYPE PATH)
-mark_as_advanced(slave_INSTALL_CMAKEDIR)
+set_property(CACHE tethys_INSTALL_CMAKEDIR PROPERTY TYPE PATH)
+mark_as_advanced(tethys_INSTALL_CMAKEDIR)
 
 install(
     FILES cmake/install-config.cmake
-    DESTINATION "${slave_INSTALL_CMAKEDIR}"
+    DESTINATION "${tethys_INSTALL_CMAKEDIR}"
     RENAME "${package}Config.cmake"
-    COMPONENT slave_Development
+    COMPONENT tethys_Development
 )
 
 install(
     FILES "${PROJECT_BINARY_DIR}/${package}ConfigVersion.cmake"
-    DESTINATION "${slave_INSTALL_CMAKEDIR}"
-    COMPONENT slave_Development
+    DESTINATION "${tethys_INSTALL_CMAKEDIR}"
+    COMPONENT tethys_Development
 )
 
 install(
-    EXPORT slaveTargets
-    NAMESPACE slave::
-    DESTINATION "${slave_INSTALL_CMAKEDIR}"
-    COMPONENT slave_Development
+    EXPORT tethysTargets
+    NAMESPACE tethys::
+    DESTINATION "${tethys_INSTALL_CMAKEDIR}"
+    COMPONENT tethys_Development
 )
 
 if(PROJECT_IS_TOP_LEVEL)
