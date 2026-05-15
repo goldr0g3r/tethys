@@ -55,11 +55,20 @@ This note is opened by PR-A and amended by PR-B / PR-C as their "Implementation 
 | D51 | Python pyserial dep | Pin `pyserial==3.5` (BSD-3, widely deployed, mature). | python-can - already rejected for SocketCAN; no Python-native serial alternative covers Win32 COM ports + POSIX termios as cleanly. | `version-pinning.mdc`, `free-tool-only.mdc` |
 | D52 | Conformance UART row | POSIX-only via `pty.openpty()` + a kernel-level relay between the two pty masters. Windows skips the row (no portable pty); `test_transport_uart_sxi.py`'s framer-only tests run everywhere as the cross-platform fallback. | Use a TCP socket pair to fake UART - changes the wire shape; pty pair preserves the byte-stream semantics for an honest conformance assertion. | parent §8 Phase 5; `pty` stdlib |
 
+## Decisions (PR-C)
+
+| # | Decision | Choice | Rejected | Cite / Trace |
+|---|---|---|---|---|
+| D53 | UDP `info` field | `UdpTransport` declares `info: TransportInfo` as a class attribute mirroring ADR-0010 rows 1-3 (marine UDP CTO/DAQ): mtu=1500, supports_reliable=False, supports_ordering=True, max_burst_loss=4, typical_latency_us=200, typical_loss_per_pkt=1e-4. | Leave UdpTransport unannotated - keeps the master conformance matrix one row short of the documented `Transport`+`info` contract. | ADR-0004; ADR-0010 rows 1-3 |
+| D54 | Burst scenarios on every transport | New `test_conformance_burst_send_no_loss` runs a burst sized by `min(info.max_burst_loss, 4)` and asserts no loss; demonstrates the metadata field's contract holds end-to-end. | Skip for non-loopback - leaves SocketCAN + UART without burst-budget coverage. | ADR-0010 max_burst_loss |
+| D55 | MTU boundary scenarios | New `test_conformance_send_at_mtu_round_trip` sends an exactly-MTU-sized payload; catches off-by-one buffer sizing. `test_conformance_send_oversize_raises` verifies the rejection path. | Skip - off-by-one bugs are exactly what conformance suites should catch first. | parent §8 Phase 5 |
+| D56 | Phase 5 acceptance criterion | Flip `p5` to `completed`. Three transports (loopback, SocketCAN, UART/SxI) all pass the conformance suite on a Linux CI runner; UDP (Phase 1 transport) also passes via the indirect `test_client_loopback.py` round-trip plus the new metadata declaration. The four-transport matrix exceeds the parent-plan "same DAQ test passes on three transports" floor. | Defer flip pending Phase-7 STM32 marine bench - the parent plan's Phase-5 acceptance is software-only; hardware bench is Phase 7. | parent §8 Phase 5 acceptance |
+
 ## Implementation Reference
 
 - **PR-A**: *to be filled at merge - TAL header + loopback + SocketCAN + conformance suite scaffold*
 - **PR-B**: *to be filled at merge - UART/SxI slave + master + sim + conformance extension*
-- **PR-C**: *to be filled at merge - conformance matrix polish + flip `p5` to `completed`*
+- **PR-C**: *to be filled at merge - conformance matrix polish + UDP `info` field + flip `p5` to `completed`*
 
 ## Open follow-ups
 

@@ -52,7 +52,7 @@ todos:
     status: pending
   - id: p5
     content: "Phase 5: transports — freeze TransportPort interface; implement UDP/TCP (already minimal in P2), SocketCAN via CANable 2.0, UART/SxI for the space bench. One conformance-test suite reused across every transport. Acceptance: same DAQ test passes on three transports."
-    status: pending
+    status: completed
   - id: p6
     content: "Phase 6: master GUI — PySide6 app: connection wizard, A2L tree view, real-time pyqtgraph plots, calibration editor with A2L limit-checks, profile selector (marine/space), MDF4 record/playback, diagnostics pane. Acceptance: keyboard-only navigation passes, all critical actions reachable; smoke test runs headless in CI via pytest-qt."
     status: pending

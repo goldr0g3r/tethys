@@ -15,6 +15,7 @@ import asyncio
 from typing import TYPE_CHECKING
 
 from tethys_master.logging_setup import get_logger
+from tethys_master.transport import TransportId, TransportInfo
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -54,6 +55,21 @@ class UdpTransport:
     The socket binds to an ephemeral local port. The remote peer is the
     address passed in the constructor.
     """
+
+    # Phase 5 PR-C: declare the TransportInfo per ADR-0004 so the conformance
+    # suite can metadata-test UDP without instantiating it. Values mirror
+    # ADR-0010 row 1/2/3 (marine UDP CTO/DAQ): unreliable, ordered (modulo
+    # IP-level reorder which is rare on a single hop), 1500-byte MTU.
+    info: TransportInfo = TransportInfo(
+        id=TransportId.UDP,
+        name="udp",
+        mtu=1500,
+        supports_reliable=False,
+        supports_ordering=True,
+        max_burst_loss=4,
+        typical_latency_us=200,
+        typical_loss_per_pkt=1e-4,
+    )
 
     def __init__(self, remote_host: str, remote_port: int) -> None:
         if not (1 <= remote_port <= 65535):
