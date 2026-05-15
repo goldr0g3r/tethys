@@ -161,5 +161,8 @@ working on Windows 11 + RubyInstaller 3.3.11 + Ceedling 1.0.1.
 
 ## Implementation Reference
 
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#17 chore(scaffold): Unity + Ceedling test harness under slave/tests/ + remove cmake-init CTest stub](https://github.com/goldr0g3r/tethys/pull/17)
+- Merged on: 2026-05-15 (squash-merged via `gh pr merge 17 --squash --admin --delete-branch`).
+- Merge SHA: `9986e6f`.
+- Toolchain installs verified on Windows 11 + RubyInstaller 3.3.11.
+- Ceedling smoke result: TESTED 2 / PASSED 2 / FAILED 0 / IGNORED 0 in 15.2 s.
