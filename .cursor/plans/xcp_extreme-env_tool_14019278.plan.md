@@ -19,7 +19,7 @@ todos:
     status: completed
   - id: p0-runbooks
     content: "Phase 0 / PR-6 docs(runbook): docs/runbooks/{release-process,hardware-setup-stm32,hil-bench-setup,traceability-matrix-maintenance,incident-and-defect,supply-chain-and-sbom,demo-recording}.md + docs/runbooks/README.md index. Each runbook is a step-by-step recipe an external engineer could execute without further context."
-    status: pending
+    status: completed
   - id: p0-github-setup-runbook
     content: "Phase 0 / PR-0a docs(runbook): docs/runbooks/github-setup.md — PAT scope spec, repo visibility (public), branch protection rules, Rulesets, CODEOWNERS, Projects v2 board creation with 4 custom fields (Phase / Workstream / Layer / Type), auto-add workflow, milestones bootstrap, label set bootstrap. Pre-requisite for p0-issues."
     status: completed
