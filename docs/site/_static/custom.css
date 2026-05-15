@@ -1,0 +1,39 @@
+/* Tethys docs site - minor branding tweaks layered on top of Furo.
+ * Kept intentionally tiny: sidebar tightening + a code-block border so
+ * command snippets read as distinct from prose.
+ *
+ * Furo CSS variables docs:
+ *   https://pradyunsg.me/furo/reference/colors/
+ */
+
+:root {
+    --color-sidebar-background: #fafafa;
+    --color-sidebar-caption-text: #555;
+}
+
+[data-theme="dark"] {
+    --color-sidebar-background: #1a1a1d;
+    --color-sidebar-caption-text: #bbb;
+}
+
+/* Slight grid-card hover lift on the landing page to nudge clickthrough. */
+.sd-card {
+    transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+.sd-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+}
+
+/* Tighten mermaid diagrams so they don't dominate the page on small
+   viewports. Furo's default scales them to 100% width which is too much
+   for the linear flowcharts in this repo. */
+.mermaid {
+    max-width: 100%;
+    margin: 1.25rem 0;
+}
+
+/* Make the standards-trace table compact (it's wide and dense). */
+.standards-trace table {
+    font-size: 0.85rem;
+}

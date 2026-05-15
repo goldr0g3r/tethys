@@ -16,6 +16,13 @@ build/
 *.obj
 *.exe
 
+# Sphinx docs site build artefacts (lands in PR-11a; build via
+# `sphinx-build -W -c docs/site -b html docs docs/_build/html`).
+# The .venv-docs/ helper venv used for local builds is also ignored.
+docs/_build/
+docs/site/_build/
+.venv-docs/
+
 # Editor / OS
 .vscode/
 .idea/

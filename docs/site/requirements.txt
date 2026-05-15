@@ -1,0 +1,13 @@
+# Tethys docs site - Sphinx + extensions.
+# Pinned per .cursor/rules/version-pinning.mdc. Renovate / Dependabot
+# manage upgrades via PR. All packages BSD / MIT licensed - no
+# free-tool-only.mdc violation (ADR-0008).
+#
+# Verified to install + build on Python 3.13 (the docs-site.yml CI runner)
+# and on the local .venv-docs venv used for the first build.
+sphinx==8.2.3                   # BSD-2-Clause - core renderer
+myst-parser==4.0.1              # MIT - markdown source format
+sphinx-design==0.6.1            # MIT - cards / grids on landing page
+sphinxcontrib-mermaid==1.0.0    # BSD-3-Clause - render mermaid diagrams
+furo==2024.8.6                  # MIT - modern responsive theme (dark/light)
+linkify-it-py==2.1.0            # MIT - myst `linkify` ext dep (auto-link bare URLs)
