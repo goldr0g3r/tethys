@@ -20,6 +20,9 @@ todos:
   - id: p0-runbooks
     content: "Phase 0 / PR-6 docs(runbook): docs/runbooks/{release-process,hardware-setup-stm32,hil-bench-setup,traceability-matrix-maintenance,incident-and-defect,supply-chain-and-sbom,demo-recording}.md + docs/runbooks/README.md index. Each runbook is a step-by-step recipe an external engineer could execute without further context."
     status: completed
+  - id: p0-scaffold-tests
+    content: "Phase 0 / PR-1a chore(scaffold-tests): Unity + Ceedling test harness under slave/tests/ via `ceedling new tests`. Reconciles PR-1 follow-up F1 (Ruby + Ceedling install + ceedling new) and F2 partial (slave/test/ -> slave/tests/). Companion chore(layout) PR handles slave/include/slave/ -> slave/include/tethys/ and slave/source/ -> slave/src/core/."
+    status: completed
   - id: p0-github-setup-runbook
     content: "Phase 0 / PR-0a docs(runbook): docs/runbooks/github-setup.md — PAT scope spec, repo visibility (public), branch protection rules, Rulesets, CODEOWNERS, Projects v2 board creation with 4 custom fields (Phase / Workstream / Layer / Type), auto-add workflow, milestones bootstrap, label set bootstrap. Pre-requisite for p0-issues."
     status: completed
