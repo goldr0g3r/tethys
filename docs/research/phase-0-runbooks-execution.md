@@ -101,8 +101,9 @@ operational runbooks need an unhappy-path option.
 
 ## Implementation Reference
 
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#16 docs(runbook): 7 runbooks per parent section 16 + README index update](https://github.com/goldr0g3r/tethys/pull/16)
+- Merged on: 2026-05-15 (squash-merged via `gh pr merge 16 --squash --admin --delete-branch`).
+- Merge SHA: `cbfaf23`.
 - Bootstrap window status: closed (PR-11 re-enabled `enforce_admins`).
 - CI status on this PR: pre-existing scaffold-only workflow failures the same
   as PR-5 (PR #15) - `trufflehog --fail` flag double-up, `clang-tidy` +
