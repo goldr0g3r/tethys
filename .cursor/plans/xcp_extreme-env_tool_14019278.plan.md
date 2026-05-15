@@ -43,7 +43,7 @@ todos:
     status: completed
   - id: p2
     content: "Phase 2: XCP protocol core — command dispatcher (CONNECT, DISCONNECT, GET_VERSION, GET_STATUS, SYNCH, SET_MTA, UPLOAD, SHORT_UPLOAD, DOWNLOAD, BUILD_CHECKSUM), CTO/DTO framing, time-stamping, A2L MEASUREMENT/CHARACTERISTIC parsing on the master side. Acceptance: 100% statement + ≥95% MC/DC on dispatcher and parser; differential test against pyxcp reference."
-    status: in_progress
+    status: completed
   - id: p3
     content: "Phase 3: DAQ + STIM — ODT engine, DAQ list configuration, event channel binding, optional PTP/IEEE-1588 timestamping, STIM path. Master records to MDF4 via asammdf, plots via pyqtgraph. Acceptance: 1 kHz DAQ on simulator with zero loss for 60 minutes; MDF4 file opens in third-party tool (Vector free MDF Viewer)."
     status: pending
