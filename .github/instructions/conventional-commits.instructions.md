@@ -38,7 +38,7 @@ Closes: #<issue>
 
 ## Allowed scopes
 
-`master`, `slave`, `transport`, `profile-marine`, `profile-space`, `docs`, `ci`, `standards`, `scaffold`, `rules`, `issues`, `runbook`, `research`, `status-sync`, `release`.
+`master`, `slave`, `transport`, `profile-marine`, `profile-space`, `docs`, `ci`, `standards`, `scaffold`, `rules`, `issues`, `runbook`, `research`, `learn`, `status-sync`, `release`.
 
 Match the `area/*` labels (parent plan Â§6.6). New scopes require a single-line update to this rule + the matching label.
 
