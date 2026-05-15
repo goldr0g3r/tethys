@@ -1,0 +1,7 @@
+# Ignore vendored markdown - Tethys does not own these.
+slave/tests/docs/**
+node_modules/**
+build/**
+slave/build/**
+**/build/**
+.venv/**

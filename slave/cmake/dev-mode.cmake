@@ -1,9 +1,10 @@
 include(cmake/folders.cmake)
 
+# Tethys note: tests are owned by Ceedling under slave/tests/ (Phase-1+).
+# Tethys keeps CTest enabled in case future integration tests want it (e.g.
+# Phase 9 HIL bench harness) but does not auto-add the legacy cmake-init
+# CTest stub which has been removed in chore(scaffold-tests).
 include(CTest)
-if(BUILD_TESTING)
-  add_subdirectory(test)
-endif()
 
 option(BUILD_MCSS_DOCS "Build documentation using Doxygen and m.css" OFF)
 if(BUILD_MCSS_DOCS)
