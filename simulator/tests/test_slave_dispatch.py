@@ -1,7 +1,8 @@
 """Unit + integration tests for the posix-sim slave dispatcher.
 
-Validates the slave responds correctly to the 4 Phase-1 commands and
-mirrors the C dispatcher's behaviour.
+Validates the slave responds correctly to the Phase-1 4 commands plus the
+Phase-2 read-path 3 commands (SET_MTA / UPLOAD / SHORT_UPLOAD), mirroring
+the C dispatcher's behaviour for the same byte-exact request layouts.
 """
 
 from __future__ import annotations
@@ -13,6 +14,9 @@ from tethys_master.protocol.frame import (
     DisconnectRequest,
     GetStatusRequest,
     GetVersionRequest,
+    SetMtaRequest,
+    ShortUploadRequest,
+    UploadRequest,
     XcpCommand,
     XcpError,
     XcpPacketId,
@@ -20,7 +24,7 @@ from tethys_master.protocol.frame import (
 )
 from tethys_master.transport.udp import UdpTransport
 
-from tethys_sim.slave import XcpSimSlave
+from tethys_sim.slave import SIM_MEMORY_SIZE, XcpSimSlave
 
 
 class TestDispatchUnit:
@@ -105,5 +109,93 @@ async def test_loopback_full_session() -> None:
             with pytest.raises(XcpProtocolError) as exc_info:
                 await client.get_status()
             assert exc_info.value.code == XcpError.ERR_ACCESS_DENIED
+    finally:
+        await slave.stop()
+
+
+# ---- Phase 2 read-path tests -----------------------------------------
+
+
+class TestPhase2DispatchUnit:
+    def test_set_mta_before_connect_denied(self) -> None:
+        slave = XcpSimSlave()
+        response = slave.dispatch(SetMtaRequest(address=0x10).encode())
+        assert response is not None
+        assert response[0] == XcpPacketId.ERR
+        assert response[1] == XcpError.ERR_ACCESS_DENIED
+
+    def test_set_mta_updates_state(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        response = slave.dispatch(SetMtaRequest(address=0xCAFEBABE, address_extension=2).encode())
+        assert response is not None
+        assert response[0] == XcpPacketId.RES
+        assert slave.state.mta_address == 0xCAFEBABE
+        assert slave.state.mta_extension == 2
+
+    def test_upload_zero_bytes_returns_out_of_range(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        response = slave.dispatch(bytes([XcpCommand.UPLOAD, 0]))
+        assert response is not None
+        assert response[0] == XcpPacketId.ERR
+        assert response[1] == XcpError.ERR_OUT_OF_RANGE
+
+    def test_upload_increments_mta(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        slave.dispatch(SetMtaRequest(address=0x10).encode())
+        response = slave.dispatch(UploadRequest(num_bytes=4).encode())
+        assert response is not None
+        assert response[0] == XcpPacketId.RES
+        assert response[1:5] == bytes([0x10, 0x11, 0x12, 0x13])
+        assert slave.state.mta_address == 0x14
+
+    def test_short_upload_leaves_mta_unchanged(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        slave.dispatch(SetMtaRequest(address=0x80).encode())
+        response = slave.dispatch(ShortUploadRequest(num_bytes=3, address=0x20).encode())
+        assert response is not None
+        assert response[0] == XcpPacketId.RES
+        assert response[1:4] == bytes([0x20, 0x21, 0x22])
+        assert slave.state.mta_address == 0x80
+
+    def test_upload_out_of_range_address(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        slave.dispatch(SetMtaRequest(address=SIM_MEMORY_SIZE - 2).encode())
+        response = slave.dispatch(UploadRequest(num_bytes=4).encode())
+        assert response is not None
+        assert response[0] == XcpPacketId.ERR
+        assert response[1] == XcpError.ERR_OUT_OF_RANGE
+
+    def test_short_upload_truncated_returns_syntax(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        response = slave.dispatch(bytes([XcpCommand.SHORT_UPLOAD, 4, 0]))  # short by 5 bytes
+        assert response is not None
+        assert response[0] == XcpPacketId.ERR
+        assert response[1] == XcpError.ERR_CMD_SYNTAX
+
+
+@pytest.mark.asyncio
+async def test_loopback_set_mta_upload_short_upload() -> None:
+    slave = XcpSimSlave(host="127.0.0.1", port=0)
+    await slave.start()
+    try:
+        port = slave.actual_port
+        async with XcpClient(UdpTransport("127.0.0.1", port), default_timeout_s=1.0) as client:
+            await client.connect()
+            await client.set_mta(address=0x00, address_extension=0)
+            chunk_a = await client.upload(num_bytes=4)
+            assert chunk_a == bytes([0x00, 0x01, 0x02, 0x03])
+            chunk_b = await client.upload(num_bytes=3)
+            assert chunk_b == bytes([0x04, 0x05, 0x06])
+
+            chunk_c = await client.short_upload(num_bytes=5, address=0x40)
+            assert chunk_c == bytes([0x40, 0x41, 0x42, 0x43, 0x44])
+
+            await client.disconnect()
     finally:
         await slave.stop()
