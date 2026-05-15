@@ -364,6 +364,45 @@ TETHYS_EXPORT int tethys_daq_apply_stim_dto(
     uint8_t const*       in_buffer,
     size_t               in_size);
 
+/**
+ * @brief Drive one event-tick: emit one DTO per running list/ODT whose
+ *        event-channel matches @p event_channel and whose prescaler
+ *        counter rolls over.
+ *
+ * The application's 1 kHz timer (posix-sim) or SysTick handler (STM32)
+ * calls this once per tick. The engine walks every allocated list whose
+ * mode bit DIRECTION_STIM is OFF (DAQ direction) and whose
+ * `event_channel == event_channel`, increments the per-list prescaler
+ * counter, and emits one DTO per ODT through @ref tethys_tr_send when
+ * the counter equals the prescaler.
+ *
+ * The dispatcher itself does not call this function - it is part of the
+ * host application's event loop and stays out of the protocol-core path
+ * so the receive-path latency is unaffected by the emission path.
+ *
+ * @param[in,out] engine        Engine state (must have memory + TAL
+ *                              attached separately).
+ * @param[in]     event_channel A2L event-channel identifier matching the
+ *                              one stored via SET_DAQ_LIST_MODE.
+ * @param[in]     timestamp_us  Monotonic microsecond clock to stamp DTOs
+ *                              with when TIMESTAMP mode is enabled.
+ *
+ * @return Number of DTOs emitted on this tick (0..MAX_LISTS *
+ *         MAX_ODT_PER_LIST). On TAL failure mid-loop the engine stops
+ *         emitting for the remainder of this tick and returns the
+ *         partial count; the TAL emits its own LOSS event so the master
+ *         sees the gap via the CTR sequence.
+ *
+ * @pre engine != NULL
+ *
+ * @safety Bounded outer loop (TETHYS_DAQ_MAX_LISTS); bounded inner loop
+ *         (TETHYS_DAQ_MAX_ODT_PER_LIST); no recursion; no dynamic alloc.
+ */
+TETHYS_EXPORT uint16_t tethys_daq_tick(
+    tethys_daq_engine_t* engine,
+    uint16_t             event_channel,
+    uint32_t             timestamp_us);
+
 /* ---- Diagnostic helpers (test-only) ---------------------------------- */
 
 /**

@@ -17,6 +17,7 @@
  */
 #include "tethys/xcp_daq.h"
 
+#include "tethys/tethys_transport.h"
 #include "tethys/xcp_odt.h"
 
 #include <stdbool.h>
@@ -515,6 +516,64 @@ int tethys_daq_apply_stim_dto(
         in_buffer,
         in_size,
         &offset);
+}
+
+/* ---- Event tick (Phase 3 PR-3b) -------------------------------------- */
+
+uint16_t tethys_daq_tick(
+    tethys_daq_engine_t* engine,
+    uint16_t             event_channel,
+    uint32_t             timestamp_us)
+{
+    if (engine == NULL) {
+        return (uint16_t)0U;
+    }
+    engine->timestamp_now_us = timestamp_us;
+    uint16_t emitted = (uint16_t)0U;
+    uint8_t scratch[TETHYS_DAQ_MAX_DTO_BYTES];
+
+    /* Bounded outer loop (compile-time constant). */
+    for (uint8_t i = (uint8_t)0U; i < engine->list_count; ++i) {
+        tethys_daq_list_t* const list = &engine->lists[i];
+        if ((!list->allocated) || (!list->running)) {
+            continue;
+        }
+        /* STIM-direction lists are master-driven; the slave's tick
+         * doesn't emit anything for them. */
+        if ((list->mode & TETHYS_DAQ_MODE_DIRECTION_STIM) != (uint8_t)0U) {
+            continue;
+        }
+        if (list->event_channel != event_channel) {
+            continue;
+        }
+        /* Prescaler: only fire every Nth matching tick (XCP 1.4
+         * §1.4.2.6 prescaler field). */
+        list->prescaler_counter = (uint8_t)(list->prescaler_counter + (uint8_t)1U);
+        if (list->prescaler_counter < list->prescaler) {
+            continue;
+        }
+        list->prescaler_counter = (uint8_t)0U;
+
+        /* Bounded inner loop (compile-time constant). */
+        for (uint8_t j = (uint8_t)0U; j < list->odt_count; ++j) {
+            size_t len = (size_t)0U;
+            if (tethys_daq_pack_dto(
+                    engine, (uint16_t)i, j, scratch, sizeof scratch, &len) != 0) {
+                /* Packing error - skip this DTO. The master will see
+                 * the CTR gap and recover via its DAQ_GAP policy. */
+                continue;
+            }
+            tethys_tr_status_t const tr =
+                tethys_tr_send(scratch, len);
+            if (tr != TETHYS_TR_OK) {
+                /* TAL refused the frame. Stop emitting for this tick;
+                 * the TAL has emitted its own LOSS event already. */
+                return emitted;
+            }
+            emitted = (uint16_t)(emitted + (uint16_t)1U);
+        }
+    }
+    return emitted;
 }
 
 /* ---- Diagnostic helpers ---------------------------------------------- */
