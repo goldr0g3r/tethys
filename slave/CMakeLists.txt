@@ -45,6 +45,8 @@ add_library(
     tethys_slave
     src/core/tethys.c
     src/core/xcp_dispatcher.c
+    src/core/xcp_daq.c
+    src/core/xcp_odt.c
     src/transport/transport.c
     src/transport/loopback.c
     src/transport/socketcan.c
