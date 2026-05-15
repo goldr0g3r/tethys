@@ -33,8 +33,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "mypy==1.13.0",
-    "pytest==8.3.3",
-    "pytest-asyncio==0.24.0",
+    "pytest==9.0.3",  # CVE-2025-71176 fix (GHSA-6w46-j5rx-g56g)
+    "pytest-asyncio==1.3.0",  # first release with pytest 9 support
     "pytest-cov==6.0.0",
     "ruff==0.7.4",
 ]
