@@ -26,32 +26,41 @@ jobs:
         with:
           fail-on-severity: moderate
           comment-summary-in-pr: on-failure
-          # On a fresh public repo without any pinned dependencies the action
-          # reports "no manifest changes". That is fine - the job still succeeds.
-          # GHAS premium features (paid) would add SCA / SCM analytics; not in
-          # scope per ADR-0008 free-tool-only.
-          allow-licenses: >-
-            MIT,
-            Apache-2.0,
-            BSD-2-Clause,
-            BSD-3-Clause,
-            ISC,
-            LGPL-2.1,
-            LGPL-2.1-only,
-            LGPL-2.1-or-later,
-            LGPL-3.0,
-            LGPL-3.0-only,
-            LGPL-3.0-or-later,
-            MPL-2.0,
-            GPL-2.0,
-            GPL-2.0-only,
-            GPL-2.0-or-later,
-            GPL-3.0,
-            GPL-3.0-only,
-            GPL-3.0-or-later,
-            Unlicense,
-            CC0-1.0,
-            Zlib,
-            BlueOak-1.0.0,
-            Python-2.0,
-            PSF-2.0
+          # License gate uses deny-licenses (blocklist) rather than allow-licenses
+          # (allowlist) because:
+          #   1. Compound SPDX expressions like "BSD-2-Clause AND BSD-3-Clause"
+          #      do not pattern-match against an individual allow-license list,
+          #      causing legitimate dual-licensed packages (colorama, packaging)
+          #      to fail.
+          #   2. ADR-0008 (free-tool-only) is the rule; named proprietary
+          #      licenses are the blocklist.
+          # Human review of each Renovate / Dependabot PR is the final
+          # licence gate per docs/runbooks/supply-chain-and-sbom.md §6.
+          deny-licenses: >-
+            AGPL-3.0,
+            AGPL-3.0-only,
+            AGPL-3.0-or-later,
+            CC-BY-NC-1.0,
+            CC-BY-NC-2.0,
+            CC-BY-NC-2.5,
+            CC-BY-NC-3.0,
+            CC-BY-NC-4.0,
+            CC-BY-NC-ND-1.0,
+            CC-BY-NC-ND-2.0,
+            CC-BY-NC-ND-2.5,
+            CC-BY-NC-ND-3.0,
+            CC-BY-NC-ND-4.0,
+            CC-BY-NC-SA-1.0,
+            CC-BY-NC-SA-2.0,
+            CC-BY-NC-SA-2.5,
+            CC-BY-NC-SA-3.0,
+            CC-BY-NC-SA-4.0,
+            CC-BY-ND-1.0,
+            CC-BY-ND-2.0,
+            CC-BY-ND-2.5,
+            CC-BY-ND-3.0,
+            CC-BY-ND-4.0,
+            Parity-7.0.0,
+            Parity-6.0.0,
+            BUSL-1.1,
+            SSPL-1.0

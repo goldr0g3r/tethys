@@ -1,16 +1,66 @@
 [project]
 name = "tethys-sim"
 version = "0.1.0"
-description = "Add your description here"
+description = "Tethys simulator - posix-sim XCP slave (host-side) for the master + slave acceptance bench"
+readme = "README.md"
+license = { text = "MIT" }
 authors = [
-    { name = "Anandhu Prakash", email = "wnp1cob@bosch.com" }
+    { name = "Tethys contributors", email = "tethys-sim@example.com" },
 ]
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.11"
+keywords = ["xcp", "asam", "simulator", "marine", "space"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Software Development :: Embedded Systems",
+]
+
+dependencies = [
+    "click==8.1.7",
+    "pydantic==2.9.2",
+    "pydantic-settings==2.6.1",
+    "structlog==24.4.0",
+    "tethys-master",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy==1.13.0",
+    "pytest==9.0.3",  # CVE-2025-71176 fix (GHSA-6w46-j5rx-g56g)
+    "pytest-asyncio==1.3.0",  # first release with pytest 9 support
+    "pytest-cov==6.0.0",
+    "ruff==0.7.4",
+]
 
 [project.scripts]
-tethys-sim = "tethys_sim:main"
+tethys-sim = "tethys_sim.cli:cli"
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+tethys-master = { path = "../master", editable = true }
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "PL", "RUF"]
+ignore = ["PLR0913", "PLR2004", "S101"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_mode = "auto"

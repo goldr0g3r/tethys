@@ -16,12 +16,12 @@ include(cmake/variables.cmake)
 # ---- Declare library ----
 #
 # Source files live under src/{core,transport,platform}/ per parent plan §14.
-# At Phase-0 only src/core/tethys.c exists; later phases add modules without
-# touching this top-level CMakeLists.txt (each subdir gets its own CMake glob
-# via target_sources(... PRIVATE ...)).
+# Phase 1 adds the XCP dispatcher under src/core/; Phase 2+ adds DAQ, CAL,
+# transport modules.
 add_library(
     tethys_slave
     src/core/tethys.c
+    src/core/xcp_dispatcher.c
 )
 add_library(tethys::slave ALIAS tethys_slave)
 

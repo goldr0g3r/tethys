@@ -40,7 +40,7 @@ todos:
     status: completed
   - id: p1
     content: "Phase 1: shared infrastructure — master package pyproject.toml (uv-managed, pinned), structlog + pydantic-settings + click CLI; slave CMake foundation with warnings-as-errors + MISRA preset + sanitisers in CI; Unity + Ceedling baseline; A2L fixture corpus checked in; posix-sim entry point. Acceptance: hello-world XCP CONNECT/DISCONNECT exchange over UDP loopback, single command line both ends."
-    status: pending
+    status: completed
   - id: p2
     content: "Phase 2: XCP protocol core — command dispatcher (CONNECT, DISCONNECT, GET_VERSION, GET_STATUS, SYNCH, SET_MTA, UPLOAD, SHORT_UPLOAD, DOWNLOAD, BUILD_CHECKSUM), CTO/DTO framing, time-stamping, A2L MEASUREMENT/CHARACTERISTIC parsing on the master side. Acceptance: 100% statement + ≥95% MC/DC on dispatcher and parser; differential test against pyxcp reference."
     status: pending
