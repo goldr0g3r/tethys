@@ -152,10 +152,46 @@ def test_disconnect_start_stop_record_actions_emit_signals(qtbot: QtBot, window:
         window.action_record.trigger()
 
 
-def test_central_widget_placeholder_present(window: MainWindow) -> None:
+def test_central_widget_is_plot_pane(window: MainWindow) -> None:
+    """PR-B: the central widget is now the PlotPane (PR-A placeholder is gone)."""
     central = window.centralWidget()
     assert central is not None
-    assert central.objectName() == "central_placeholder"
+    assert central.objectName() == "plot_pane"
+    assert central is window.plot_pane()
+
+
+def test_a2l_dock_and_diagnostics_dock_attached(window: MainWindow) -> None:
+    """PR-B: A2L tree + diagnostics docks attach on construction."""
+    from PySide6.QtCore import Qt
+
+    a2l_dock = window.a2l_dock()
+    diag_dock = window.diagnostics_dock()
+    assert a2l_dock.objectName() == "a2l_dock"
+    assert diag_dock.objectName() == "diagnostics_dock"
+    assert window.dockWidgetArea(a2l_dock) == Qt.DockWidgetArea.LeftDockWidgetArea
+    assert window.dockWidgetArea(diag_dock) == Qt.DockWidgetArea.BottomDockWidgetArea
+
+
+def test_view_menu_lists_dock_toggles(window: MainWindow) -> None:
+    """PR-B: the View menu exposes A2L tree + Diagnostics toggles."""
+    menu_bar = window.menuBar()
+    assert menu_bar is not None
+    view_action = next(a for a in menu_bar.actions() if a.text().replace("&", "") == "View")
+    view_menu = view_action.menu()
+    assert view_menu is not None
+    toggle_names = {a.objectName() for a in view_menu.actions() if a.objectName()}
+    assert "action_view_a2l" in toggle_names
+    assert "action_view_diagnostics" in toggle_names
+
+
+def test_record_daq_gap_updates_pane_diagnostics_and_status(window: MainWindow) -> None:
+    """PR-B: a DAQ_GAP event drives plot markers, diag counter, status counter together."""
+    window.record_daq_gap(at_seconds=3.5)
+    window.record_daq_gap(at_seconds=7.25)
+    assert window.plot_pane().gap_count() == 2
+    assert window.diagnostics_pane().gap_events() == 2
+    _, _, gaps_label = window.status_labels()
+    assert gaps_label.text() == "Gaps: 2"
 
 
 def test_show_about_dialog_does_not_crash(qtbot: QtBot, window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
