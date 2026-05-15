@@ -10,13 +10,18 @@ from __future__ import annotations
 import pytest
 from tethys_master.protocol.client import XcpClient, XcpProtocolError
 from tethys_master.protocol.frame import (
+    BuildChecksumRequest,
+    BuildChecksumResponse,
     ConnectResponse,
     DisconnectRequest,
+    DownloadRequest,
     GetStatusRequest,
     GetVersionRequest,
     SetMtaRequest,
     ShortUploadRequest,
+    SynchRequest,
     UploadRequest,
+    XcpChecksumType,
     XcpCommand,
     XcpError,
     XcpPacketId,
@@ -195,6 +200,79 @@ async def test_loopback_set_mta_upload_short_upload() -> None:
 
             chunk_c = await client.short_upload(num_bytes=5, address=0x40)
             assert chunk_c == bytes([0x40, 0x41, 0x42, 0x43, 0x44])
+
+            await client.disconnect()
+    finally:
+        await slave.stop()
+
+
+class TestPhase2WriteAndChecksum:
+    def test_download_writes_memory_and_advances_mta(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        slave.dispatch(SetMtaRequest(address=0x40).encode())
+        response = slave.dispatch(DownloadRequest(data=b"\xde\xad\xbe\xef").encode())
+        assert response is not None
+        assert response[0] == XcpPacketId.RES
+        assert bytes(slave.state.memory[0x40:0x44]) == b"\xde\xad\xbe\xef"
+        assert slave.state.mta_address == 0x44
+
+    def test_download_oversized_returns_out_of_range(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        response = slave.dispatch(bytes([XcpCommand.DOWNLOAD, 7, 0, 0, 0, 0, 0, 0, 0]))
+        assert response is not None
+        assert response[0] == XcpPacketId.ERR
+        assert response[1] == XcpError.ERR_OUT_OF_RANGE
+
+    def test_build_checksum_zero_block_returns_out_of_range(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        response = slave.dispatch(bytes([XcpCommand.BUILD_CHECKSUM, 0, 0, 0, 0, 0, 0, 0]))
+        assert response is not None
+        assert response[0] == XcpPacketId.ERR
+        assert response[1] == XcpError.ERR_OUT_OF_RANGE
+
+    def test_build_checksum_returns_add_44_sum(self) -> None:
+        slave = XcpSimSlave()
+        slave.dispatch(bytes([XcpCommand.CONNECT, 0]))
+        slave.dispatch(SetMtaRequest(address=0x10).encode())
+        response = slave.dispatch(BuildChecksumRequest(block_size=4).encode())
+        assert response is not None
+        assert response[0] == XcpPacketId.RES
+        decoded = BuildChecksumResponse.decode(response[1:])
+        assert decoded.checksum_type == XcpChecksumType.ADD_44
+        assert decoded.checksum == 0x10 + 0x11 + 0x12 + 0x13
+        assert slave.state.mta_address == 0x14
+
+    def test_synch_returns_err_cmd_synch(self) -> None:
+        slave = XcpSimSlave()
+        # No CONNECT - SYNCH is allowed in any state.
+        response = slave.dispatch(SynchRequest().encode())
+        assert response is not None
+        assert response[0] == XcpPacketId.ERR
+        assert response[1] == XcpError.ERR_CMD_SYNCH
+
+
+@pytest.mark.asyncio
+async def test_loopback_download_checksum_synch() -> None:
+    slave = XcpSimSlave(host="127.0.0.1", port=0)
+    await slave.start()
+    try:
+        port = slave.actual_port
+        async with XcpClient(UdpTransport("127.0.0.1", port), default_timeout_s=1.0) as client:
+            await client.connect()
+            await client.set_mta(address=0x80, address_extension=0)
+            await client.download(b"\x01\x02\x03\x04")
+            assert bytes(slave.state.memory[0x80:0x84]) == b"\x01\x02\x03\x04"
+
+            await client.set_mta(address=0x80, address_extension=0)
+            response = await client.build_checksum(block_size=4)
+            assert response.checksum == 0x01 + 0x02 + 0x03 + 0x04
+            assert response.checksum_type == XcpChecksumType.ADD_44
+
+            # SYNCH must complete cleanly (ERR_CMD_SYNCH is the expected ack).
+            await client.synch()
 
             await client.disconnect()
     finally:

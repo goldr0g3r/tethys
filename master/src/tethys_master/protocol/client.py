@@ -1,8 +1,9 @@
 """High-level XCP client (master side).
 
 Wraps a :class:`Transport` with the request/response orchestration for
-the Phase 1 + Phase 2 read-path command set. Phase 2 PR-29 extends to
-DOWNLOAD / BUILD_CHECKSUM / SYNCH.
+the Phase 1 + Phase 2 command set (CONNECT, DISCONNECT, GET_STATUS,
+GET_VERSION, SYNCH, SET_MTA, UPLOAD, SHORT_UPLOAD, DOWNLOAD,
+BUILD_CHECKSUM).
 
 Cite: ASAM XCP 1.4 Part 2 §1.3 (Standard Command set)
 Cite: ADR-0004 (transport abstraction layer)
@@ -14,9 +15,12 @@ from typing import TYPE_CHECKING
 
 from tethys_master.logging_setup import get_logger
 from tethys_master.protocol.frame import (
+    BuildChecksumRequest,
+    BuildChecksumResponse,
     ConnectRequest,
     ConnectResponse,
     DisconnectRequest,
+    DownloadRequest,
     ErrorResponse,
     GetStatusRequest,
     GetStatusResponse,
@@ -24,8 +28,10 @@ from tethys_master.protocol.frame import (
     GetVersionResponse,
     SetMtaRequest,
     ShortUploadRequest,
+    SynchRequest,
     UploadRequest,
     UploadResponse,
+    XcpError,
     XcpPacketId,
     parse_response,
 )
@@ -174,3 +180,55 @@ class XcpClient:
         response = UploadResponse.decode(body)
         logger.info("xcp.short_upload.ok", got=len(response.data))
         return response.data[:num_bytes]
+
+    # ---- Phase 2 write / checksum / sync ----------------------------
+
+    async def download(self, data: bytes) -> None:
+        """DOWNLOAD - write ``data`` to the current MTA (auto-increments).
+
+        Cite: ASAM XCP 1.4 Part 2 §1.3.4.1
+        """
+        logger.info("xcp.download.start", num_bytes=len(data))
+        request = DownloadRequest(data=bytes(data)).encode()
+        body = self._ensure_positive(await self._request(request))
+        if body:
+            logger.warning("xcp.download.unexpected_body", bytes=len(body))
+        logger.info("xcp.download.ok")
+
+    async def build_checksum(self, block_size: int) -> BuildChecksumResponse:
+        """BUILD_CHECKSUM - sum ``block_size`` bytes starting at MTA.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.5.1
+        """
+        logger.info("xcp.build_checksum.start", block_size=block_size)
+        request = BuildChecksumRequest(block_size=block_size).encode()
+        body = self._ensure_positive(await self._request(request))
+        response = BuildChecksumResponse.decode(body)
+        logger.info(
+            "xcp.build_checksum.ok",
+            checksum=hex(response.checksum),
+            checksum_type=hex(response.checksum_type),
+        )
+        return response
+
+    async def synch(self) -> None:
+        """SYNCH - reset the slave's protocol state machine.
+
+        The slave is required to respond with ERR_CMD_SYNCH; this is the
+        documented synchronisation handshake, not an error. The client
+        absorbs the ERR_CMD_SYNCH response silently.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.3.1.2
+        """
+        logger.info("xcp.synch.start")
+        request = SynchRequest().encode()
+        packet = await self._request(request)
+        packet_id, body = parse_response(packet)
+        if packet_id == XcpPacketId.ERR and body and body[0] == XcpError.ERR_CMD_SYNCH:
+            logger.info("xcp.synch.ok")
+            return
+        # Any other response is unexpected; surface it as a protocol error.
+        if packet_id == XcpPacketId.ERR:
+            err = ErrorResponse.decode(body)
+            raise XcpProtocolError(err.error_code, err.info)
+        raise XcpProtocolError(packet_id, body)

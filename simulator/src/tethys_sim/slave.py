@@ -1,12 +1,13 @@
-"""posix-sim XCP slave - asyncio UDP server (Phase 1 + Phase 2 read path).
+"""posix-sim XCP slave - asyncio UDP server (Phase 1 + Phase 2 full).
 
 This is a Python-side functional twin of the C dispatcher in
 ``slave/src/core/xcp_dispatcher.c``. Both must agree on the wire-level
-behaviour of the supported commands so the acceptance bench can swap
-between them transparently. Phase 2 PR-28 adds SET_MTA / UPLOAD /
-SHORT_UPLOAD against a deterministic 1 KiB ramp-pattern memory backend.
+behaviour of the supported commands so the acceptance bench (and the
+PR-31 differential test against pyxcp) can swap between them
+transparently. The Python implementation operates against a 1 KiB
+ramp-pattern memory backend.
 
-Cite: ASAM XCP 1.4 Part 2 §1.3.2 + §1.3.3 + §1.4.2.1
+Cite: ASAM XCP 1.4 Part 2 §1.3.1..§1.3.4 + §1.4.2.1 + §1.5
 Cite: parent plan §8 (Phase 2 acceptance)
 """
 
@@ -17,11 +18,14 @@ from dataclasses import dataclass, field
 
 from tethys_master.logging_setup import get_logger
 from tethys_master.protocol.frame import (
+    XCP_MAX_DOWNLOAD_BYTES,
     XCP_MAX_UPLOAD_BYTES,
+    BuildChecksumResponse,
     ConnectResponse,
     GetStatusResponse,
     GetVersionResponse,
     ResourceMask,
+    XcpChecksumType,
     XcpCommand,
     XcpError,
     encode_error_response,
@@ -116,7 +120,7 @@ class XcpSimSlave:
             self._transport.close()
             logger.info("sim.stopped")
 
-    def dispatch(self, packet: bytes) -> bytes | None:  # noqa: PLR0911 - one return per XCP command branch
+    def dispatch(self, packet: bytes) -> bytes | None:  # noqa: PLR0911, PLR0912 - one branch per XCP command
         """Dispatch a single inbound CTO request and return the response body.
 
         Mirrors the slave C dispatcher's behaviour.
@@ -174,6 +178,12 @@ class XcpSimSlave:
             return self._handle_upload(packet)
         if cmd == XcpCommand.SHORT_UPLOAD:
             return self._handle_short_upload(packet)
+        if cmd == XcpCommand.DOWNLOAD:
+            return self._handle_download(packet)
+        if cmd == XcpCommand.BUILD_CHECKSUM:
+            return self._handle_build_checksum(packet)
+        if cmd == XcpCommand.SYNCH:
+            return self._handle_synch()
         logger.warning("sim.cmd.unknown", cmd=hex(cmd))
         return encode_error_response(XcpError.ERR_CMD_UNKNOWN)
 
@@ -226,3 +236,53 @@ class XcpSimSlave:
         chunk = bytes(self._state.memory[address : address + num])
         logger.info("sim.cmd.short_upload", address=hex(address), num=num)
         return encode_positive_response(chunk)
+
+    def _handle_download(self, packet: bytes) -> bytes:
+        if not self._state.connected:
+            logger.warning("sim.cmd.download.not_connected")
+            return encode_error_response(XcpError.ERR_ACCESS_DENIED)
+        if len(packet) < 2:
+            return encode_error_response(XcpError.ERR_CMD_SYNTAX)
+        num = packet[1]
+        if num < 1 or num > XCP_MAX_DOWNLOAD_BYTES:
+            return encode_error_response(XcpError.ERR_OUT_OF_RANGE)
+        if len(packet) < 2 + num:
+            return encode_error_response(XcpError.ERR_CMD_SYNTAX)
+        start = self._state.mta_address
+        if start + num > len(self._state.memory):
+            return encode_error_response(XcpError.ERR_OUT_OF_RANGE)
+        payload = packet[2 : 2 + num]
+        self._state.memory[start : start + num] = payload
+        self._state.mta_address += num
+        logger.info("sim.cmd.download", start=hex(start), num=num)
+        return encode_positive_response(b"")
+
+    def _handle_build_checksum(self, packet: bytes) -> bytes:
+        if not self._state.connected:
+            logger.warning("sim.cmd.build_checksum.not_connected")
+            return encode_error_response(XcpError.ERR_ACCESS_DENIED)
+        if len(packet) < 8:
+            return encode_error_response(XcpError.ERR_CMD_SYNTAX)
+        block_size = int.from_bytes(packet[4:8], byteorder="little", signed=False)
+        if block_size == 0:
+            return encode_error_response(XcpError.ERR_OUT_OF_RANGE)
+        start = self._state.mta_address
+        if start + block_size > len(self._state.memory):
+            return encode_error_response(XcpError.ERR_OUT_OF_RANGE)
+        checksum = sum(self._state.memory[start : start + block_size]) & 0xFFFFFFFF
+        self._state.mta_address += block_size
+        response = BuildChecksumResponse(
+            checksum_type=XcpChecksumType.ADD_44, checksum=checksum
+        )
+        logger.info(
+            "sim.cmd.build_checksum",
+            start=hex(start),
+            block_size=block_size,
+            checksum=hex(checksum),
+        )
+        return encode_positive_response(response.encode_body())
+
+    def _handle_synch(self) -> bytes:
+        """SYNCH always responds with ERR_CMD_SYNCH per XCP 1.4 Part 2 §1.3.1.2."""
+        logger.info("sim.cmd.synch")
+        return encode_error_response(XcpError.ERR_CMD_SYNCH)

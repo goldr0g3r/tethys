@@ -10,10 +10,14 @@ from __future__ import annotations
 import pytest
 
 from tethys_master.protocol.frame import (
+    XCP_MAX_DOWNLOAD_BYTES,
     XCP_MAX_UPLOAD_BYTES,
+    BuildChecksumRequest,
+    BuildChecksumResponse,
     ConnectRequest,
     ConnectResponse,
     DisconnectRequest,
+    DownloadRequest,
     ErrorResponse,
     GetStatusRequest,
     GetStatusResponse,
@@ -22,8 +26,10 @@ from tethys_master.protocol.frame import (
     ResourceMask,
     SetMtaRequest,
     ShortUploadRequest,
+    SynchRequest,
     UploadRequest,
     UploadResponse,
+    XcpChecksumType,
     XcpCommand,
     XcpError,
     XcpPacketId,
@@ -233,3 +239,52 @@ class TestUploadResponse:
     def test_decode_empty_payload(self) -> None:
         decoded = UploadResponse.decode(b"")
         assert decoded.data == b""
+
+
+# ---- Phase 2 write / checksum / sync frames ---------------------------
+
+
+class TestDownloadRequest:
+    def test_encode_layout(self) -> None:
+        encoded = DownloadRequest(data=b"\xde\xad\xbe\xef").encode()
+        assert encoded == bytes([XcpCommand.DOWNLOAD, 4, 0xDE, 0xAD, 0xBE, 0xEF])
+
+    def test_encode_rejects_empty(self) -> None:
+        with pytest.raises(ValueError, match="DOWNLOAD payload"):
+            DownloadRequest(data=b"").encode()
+
+    def test_encode_rejects_oversized(self) -> None:
+        with pytest.raises(ValueError, match="DOWNLOAD payload"):
+            DownloadRequest(data=bytes(XCP_MAX_DOWNLOAD_BYTES + 1)).encode()
+
+
+class TestBuildChecksumRequest:
+    def test_encode_layout(self) -> None:
+        encoded = BuildChecksumRequest(block_size=0x1000).encode()
+        assert len(encoded) == 8
+        assert encoded[0] == XcpCommand.BUILD_CHECKSUM
+        assert encoded[1:4] == b"\x00\x00\x00"
+        assert encoded[4:8] == b"\x00\x10\x00\x00"  # little-endian 0x1000
+
+    @pytest.mark.parametrize("block_size", [0, 0x1_0000_0000])
+    def test_encode_rejects_out_of_range(self, block_size: int) -> None:
+        with pytest.raises(ValueError, match="block_size"):
+            BuildChecksumRequest(block_size=block_size).encode()
+
+
+class TestBuildChecksumResponse:
+    def test_roundtrip(self) -> None:
+        original = BuildChecksumResponse(
+            checksum_type=XcpChecksumType.ADD_44, checksum=0xCAFEBABE
+        )
+        decoded = BuildChecksumResponse.decode(original.encode_body())
+        assert decoded == original
+
+    def test_decode_too_short_raises(self) -> None:
+        with pytest.raises(ValueError, match="too short"):
+            BuildChecksumResponse.decode(b"\x06\x00\x00")
+
+
+class TestSynchRequest:
+    def test_encode(self) -> None:
+        assert SynchRequest().encode() == bytes([XcpCommand.SYNCH])
