@@ -9,7 +9,7 @@
 [![ecss-trace](https://github.com/goldr0g3r/tethys/actions/workflows/a2l-roundtrip.yml/badge.svg)](https://github.com/goldr0g3r/tethys/actions/workflows/a2l-roundtrip.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-> Badge URLs assume the PR-4 (`p0-ci`) workflows. Until PR-4 lands they render as broken images on purpose - they advertise the PR-4 gap and force its completion.
+> Badges live since PR #11 (p0-ci) + PR #19 (F5 workflow rename to canonical contexts). Branch protection now requires 7 status checks: `build`, `misra-gate`, `static-analysis`, `coverage`, `secret-scan`, `dependency-review`, `pr-title`.
 
 ## 60-second pitch
 
@@ -81,26 +81,49 @@ See [`docs/architecture/system-context.md`](docs/architecture/system-context.md)
 
 ## Quick start
 
-Tethys is in Phase 0 (foundation). The functional code lands in Phase 1+. Today you can:
+Phase 1 ships the hello-world XCP CONNECT/DISCONNECT acceptance bench. From a clean clone:
 
 ```bash
-# Clone
 git clone https://github.com/goldr0g3r/tethys.git
 cd tethys
 
-# Master (Python; uv-managed)
+# Terminal 1 - posix-sim slave
+cd simulator && uv sync
+uv run tethys-sim serve --transport udp --port 5555
+
+# Terminal 2 - master CLI
 cd master && uv sync
-
-# Simulator
-cd ../simulator && uv sync
-
-# Slave (CMake + Ninja; needs cmake-init or PR-1a Ceedling for tests)
-cd ../slave
-cmake --preset=dev   # configures dev build
-cmake --build --preset=dev
+uv run tethys-master connect --target udp://127.0.0.1:5555
 ```
 
-The CLI entry points (`uv run tethys-master ...` etc.) land in Phase 1 per the parent plan.
+Expected output (under 1 ms wall-clock on UDP loopback):
+
+```text
+CONNECT OK
+  resource = 0x05
+  comm     = 0x80
+  max_cto  = 8
+  max_dto  = 256
+  protocol = 0x01, transport = 0x01
+  version  = protocol 1.4, transport 1.4
+  status   = session 0x80, protect 0x00
+DISCONNECT OK
+```
+
+For the C slave library + Unity tests:
+
+```bash
+# Slave library build (cmake-init derived)
+cd slave
+cmake --preset=dev
+cmake --build --preset=dev
+
+# Unity + Ceedling tests (requires Ruby 3.3 + ceedling gem)
+cd tests
+ceedling test:all   # 18 tests pass
+```
+
+Test totals after Phase 1: **49 tests passing** (23 master + 8 simulator + 18 slave).
 
 ## Architecture Decision Records (ADRs)
 
@@ -119,30 +142,42 @@ Tethys uses [MADR v3.0](https://adr.github.io/madr/). See [`docs/adr/README.md`]
 
 ## Runbooks
 
-Step-by-step recipes any engineer can execute. See [`docs/runbooks/README.md`](docs/runbooks/README.md) for the full index. Currently:
+Step-by-step recipes any engineer can execute. See [`docs/runbooks/README.md`](docs/runbooks/README.md) for the full index. 8 runbooks shipped:
 
-- [`github-setup.md`](docs/runbooks/github-setup.md) - bootstrap the GitHub surface (labels, milestones, branch protection, Projects v2 board, bootstrap issues)
-- Remaining runbooks (release-process, hardware-setup-stm32, hil-bench-setup, traceability-matrix-maintenance, incident-and-defect, supply-chain-and-sbom, demo-recording) land in PR-6.
+- [`github-setup.md`](docs/runbooks/github-setup.md) - PR-0a: PAT, repo, branch protection, CODEOWNERS, Projects v2, milestones, labels, auto-add workflow, Phase-0 issues.
+- [`release-process.md`](docs/runbooks/release-process.md) - PR-6: tag `v0.x.y` -> `release.yml` -> PyInstaller bundles + slave tarball + Docker image + CycloneDX SBOM + GitHub Release + PyPI.
+- [`hardware-setup-stm32.md`](docs/runbooks/hardware-setup-stm32.md) - PR-6: NUCLEO-F767ZI marine + NUCLEO-H753ZI space wiring, flashing, transport setup.
+- [`hil-bench-setup.md`](docs/runbooks/hil-bench-setup.md) - PR-6: closed-loop master + slave + Simulink plant model via MATLAB `py.` interface.
+- [`traceability-matrix-maintenance.md`](docs/runbooks/traceability-matrix-maintenance.md) - PR-6: csv schema, add-row, CI gate behaviour.
+- [`incident-and-defect.md`](docs/runbooks/incident-and-defect.md) - PR-6: severity matrix, MISRA deviation lifecycle, security incident handling, PIR template.
+- [`supply-chain-and-sbom.md`](docs/runbooks/supply-chain-and-sbom.md) - PR-6: CycloneDX SBOM, Renovate/Dependabot, 90-day PAT rotation, CVE triage, license audit.
+- [`demo-recording.md`](docs/runbooks/demo-recording.md) - PR-6: OBS Studio + DaVinci Resolve + shot lists for both demos.
 
 ## Research notes
 
-The per-phase evidence trail under [`docs/research/`](docs/research/). Currently:
+Per-phase evidence trail under [`docs/research/`](docs/research/) (research-note-per-phase rule). 11 notes shipped:
 
-- [`phase-0-github-setup.md`](docs/research/phase-0-github-setup.md) - PR-0a research note (GitHub setup decisions)
-- [`phase-0-system-requirements.md`](docs/research/phase-0-system-requirements.md) - PR-0c research note (12-section multi-standard analysis, packet-loss budget anchor)
+- [`phase-0-github-setup.md`](docs/research/phase-0-github-setup.md) - PR-0a (GitHub setup decisions)
+- [`phase-0-system-requirements.md`](docs/research/phase-0-system-requirements.md) - PR-0c (12-section multi-standard analysis, packet-loss budget anchor)
 - [`phase-0-standards-matrix.csv`](docs/research/phase-0-standards-matrix.csv) + [`phase-0-standards-matrix.md`](docs/research/phase-0-standards-matrix.md) - 35-row standards landscape
-- [`phase-0-issues-execution.md`](docs/research/phase-0-issues-execution.md) - PR-4 (`p0-issues`) execution record
-- [`phase-1-scaffold-execution.md`](docs/research/phase-1-scaffold-execution.md) - PR-5 (`p0-scaffold`) execution record
-- [`phase-0-rules-execution.md`](docs/research/phase-0-rules-execution.md) - PR-7 (`p0-rules`) execution record
-- [`phase-0-docs-execution.md`](docs/research/phase-0-docs-execution.md) - this PR's execution record
+- [`phase-0-issues-execution.md`](docs/research/phase-0-issues-execution.md) - PR #4 (`p0-issues`)
+- [`phase-1-scaffold-execution.md`](docs/research/phase-1-scaffold-execution.md) - PR #5 (`p0-scaffold`)
+- [`phase-0-rules-execution.md`](docs/research/phase-0-rules-execution.md) - PR #7 (`p0-rules`)
+- [`phase-0-docs-execution.md`](docs/research/phase-0-docs-execution.md) - PR #9 (`p0-docs`)
+- [`phase-0-ci-execution.md`](docs/research/phase-0-ci-execution.md) - PR #11 (`p0-ci`)
+- [`phase-0-coding-standards-execution.md`](docs/research/phase-0-coding-standards-execution.md) - PR #15 (`p0-coding-standards`)
+- [`phase-0-runbooks-execution.md`](docs/research/phase-0-runbooks-execution.md) - PR #16 (`p0-runbooks`)
+- [`phase-0-scaffold-tests-execution.md`](docs/research/phase-0-scaffold-tests-execution.md) - PR #17 (`p0-scaffold-tests`)
+- [`phase-0-layout-execution.md`](docs/research/phase-0-layout-execution.md) - PR #18 (`p0-layout`)
+- [`phase-0-ci-fixes-f5-execution.md`](docs/research/phase-0-ci-fixes-f5-execution.md) - PR #19 + #21 (F5 workflow rename + branch protection re-tighten)
+- [`phase-1-shared-infrastructure-execution.md`](docs/research/phase-1-shared-infrastructure-execution.md) - PR #22 (Phase 1 hello-world XCP)
 
 ## Phase progress
 
-| Phase | Status | PRs |
+| Phase | Status | Key PR(s) |
 | --- | --- | --- |
-| Phase 0 - Foundation | in progress | PR-0a, PR-0c, #4 (`p0-issues`), #5 (`p0-scaffold`), #7 (`p0-rules`), this PR (`p0-docs`) |
-| Phase 0 remaining | pending | `p0-ci`, `p0-coding-standards`, `p0-runbooks` |
-| Phase 1 - Shared infrastructure | pending | `p1` |
+| **Phase 0** - Foundation | **completed** | #4 (issues), #5 (scaffold), #7 (rules), #9 (docs/ADRs), #11 (CI), #15 (coding-standards), #16 (runbooks), #17 (scaffold-tests), #18 (layout), #19 + #21 (F5 workflow rename + branch protection) |
+| **Phase 1** - Shared infrastructure | **completed** | #22 (master + simulator + slave XCP CONNECT/DISCONNECT/GET_VERSION/GET_STATUS over UDP loopback, 49 tests green, <1ms round-trip) |
 | Phase 2 - XCP protocol core | pending | `p2` |
 | Phase 3 - DAQ + STIM | pending | `p3` |
 | Phase 4 - CAL + PAG | pending | `p4` |
