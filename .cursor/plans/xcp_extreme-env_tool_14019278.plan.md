@@ -23,6 +23,9 @@ todos:
   - id: p0-scaffold-tests
     content: "Phase 0 / PR-1a chore(scaffold-tests): Unity + Ceedling test harness under slave/tests/ via `ceedling new tests`. Reconciles PR-1 follow-up F1 (Ruby + Ceedling install + ceedling new) and F2 partial (slave/test/ -> slave/tests/). Companion chore(layout) PR handles slave/include/slave/ -> slave/include/tethys/ and slave/source/ -> slave/src/core/."
     status: completed
+  - id: p0-layout
+    content: "Phase 0 / PR-1b chore(layout): rebrand slave -> tethys (CMake project + target + alias + install rules); slave/include/slave/slave.h -> slave/include/tethys/tethys.h; slave/source/slave.c -> slave/src/core/tethys.c; add CMakePresets.json `dev` configure preset for CI clang-tidy + gcc-fanalyzer. Resolves PR-1 follow-up F2 + half of F5 (CI preset)."
+    status: completed
   - id: p0-github-setup-runbook
     content: "Phase 0 / PR-0a docs(runbook): docs/runbooks/github-setup.md — PAT scope spec, repo visibility (public), branch protection rules, Rulesets, CODEOWNERS, Projects v2 board creation with 4 custom fields (Phase / Workstream / Layer / Type), auto-add workflow, milestones bootstrap, label set bootstrap. Pre-requisite for p0-issues."
     status: completed

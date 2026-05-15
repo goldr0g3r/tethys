@@ -1,29 +1,29 @@
 # ---- Developer mode ----
 
 # Developer mode enables targets and code paths in the CMake scripts that are
-# only relevant for the developer(s) of slave
+# only relevant for the developer(s) of tethys.
 # Targets necessary to build the project must be provided unconditionally, so
-# consumers can trivially build and package the project
+# consumers can trivially build and package the project.
 if(PROJECT_IS_TOP_LEVEL)
-  option(slave_DEVELOPER_MODE "Enable developer mode" OFF)
+  option(tethys_DEVELOPER_MODE "Enable developer mode" OFF)
   option(BUILD_SHARED_LIBS "Build shared libs." OFF)
 endif()
 
 # ---- Warning guard ----
 
 # target_include_directories with the SYSTEM modifier will request the compiler
-# to omit warnings from the provided paths, if the compiler supports that
+# to omit warnings from the provided paths, if the compiler supports that.
 # This is to provide a user experience similar to find_package when
-# add_subdirectory or FetchContent is used to consume this project
+# add_subdirectory or FetchContent is used to consume this project.
 set(warning_guard "")
 if(NOT PROJECT_IS_TOP_LEVEL)
   option(
-      slave_INCLUDES_WITH_SYSTEM
-      "Use SYSTEM modifier for slave's includes, disabling warnings"
+      tethys_INCLUDES_WITH_SYSTEM
+      "Use SYSTEM modifier for tethys's includes, disabling warnings"
       ON
   )
-  mark_as_advanced(slave_INCLUDES_WITH_SYSTEM)
-  if(slave_INCLUDES_WITH_SYSTEM)
+  mark_as_advanced(tethys_INCLUDES_WITH_SYSTEM)
+  if(tethys_INCLUDES_WITH_SYSTEM)
     set(warning_guard SYSTEM)
   endif()
 endif()

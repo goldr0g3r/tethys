@@ -26,8 +26,14 @@
       "hidden": true,
       "inherits": "cmake-pedantic",
       "cacheVariables": {
-        "slave_DEVELOPER_MODE": "ON"
+        "tethys_DEVELOPER_MODE": "ON"
       }
+    },
+    {
+      "name": "dev",
+      "description": "Alias for ci-ubuntu - used by static-analysis.yml + gcc-fanalyzer jobs",
+      "binaryDir": "${sourceDir}/build/dev",
+      "inherits": ["ci-build", "ci-linux", "clang-tidy", "cppcheck", "dev-mode"]
     },
     {
       "name": "cppcheck",
