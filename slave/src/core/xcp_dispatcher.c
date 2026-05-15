@@ -1,10 +1,10 @@
 /*
- * src/core/xcp_dispatcher.c - XCP command dispatcher (Phase 1 + Phase 2 read path).
+ * src/core/xcp_dispatcher.c - XCP command dispatcher (Phase 1 + Phase 2).
  *
  * Module: tethys::core::xcp_dispatcher
  * Profiles: all
- * Standards: ASAM XCP 1.4 Part 2 §1.3.2 + §1.3.3 + §1.4.2.1; MISRA C:2023
- * Trace: docs/traceability.csv (rows TETHYS-DES-0001..0007 land at PR-10)
+ * Standards: ASAM XCP 1.4 Part 2 §1.3.1..§1.3.4 + §1.4.2.1 + §1.5; MISRA C:2023
+ * Trace: docs/traceability.csv (rows TETHYS-DES-0001..0010 land at PR-10)
  *
  * Copyright (c) 2026 Tethys contributors. SPDX-License-Identifier: MIT.
  */
@@ -283,6 +283,151 @@ static size_t handle_short_upload(
     return write_upload_response(response, resp_cap, state->memory, address, n_bytes);
 }
 
+/* ---- Phase 2 write/checksum/sync handlers ---------------------------- */
+
+/**
+ * @brief Handle DOWNLOAD (0xF0).
+ *
+ * Wire layout (XCP 1.4 Part 2 §1.3.4.1):
+ *   [0]      PID = 0xF0
+ *   [1]      N (1..MAX_CTO-2 = 1..6)
+ *   [2..1+N] data bytes to write at MTA
+ *
+ * Side-effect: MTA auto-increments by N on success.
+ *
+ * @return number of bytes written to @p response (always 1: PID-only RES).
+ */
+static size_t handle_download(
+    tethys_xcp_state_t* state,
+    uint8_t const*      request,
+    size_t              req_len,
+    uint8_t*            response,
+    size_t              resp_cap)
+{
+    if (!state->connected) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (state->memory == NULL) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (req_len < (size_t)2U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    uint8_t const n_bytes = request[1];
+    /* DOWNLOAD payload starts at byte 2; max payload = MAX_CTO - 2. */
+    if ((n_bytes == (uint8_t)0U) || (n_bytes > (uint8_t)(TETHYS_XCP_MAX_CTO - 2U))) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    if (req_len < ((size_t)2U + (size_t)n_bytes)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (!memory_span_ok(state, state->mta_address, (size_t)n_bytes)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    /* MISRA-compliant bounded copy. */
+    for (uint8_t i = (uint8_t)0U; i < n_bytes; ++i) {
+        state->memory[(size_t)state->mta_address + (size_t)i] = request[(size_t)2U + (size_t)i];
+    }
+    state->mta_address += (uint32_t)n_bytes;
+    if (resp_cap < (size_t)1U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    return (size_t)1U;
+}
+
+/**
+ * @brief Compute the XCP_ADD_44 sum of @p len bytes starting at @p memory + @p start.
+ *
+ * Wraps modulo 2^32 (defined behaviour for uint32_t arithmetic).
+ */
+static uint32_t add_44_checksum(uint8_t const* memory, uint32_t start, uint32_t len)
+{
+    uint32_t sum = (uint32_t)0U;
+    for (uint32_t i = (uint32_t)0U; i < len; ++i) {
+        sum += (uint32_t)memory[(size_t)start + (size_t)i];
+    }
+    return sum;
+}
+
+/**
+ * @brief Handle BUILD_CHECKSUM (0xF3).
+ *
+ * Wire layout (XCP 1.4 Part 2 §1.5.1):
+ *   [0]    PID = 0xF3
+ *   [1..3] reserved (zero)
+ *   [4..7] block_size (4 bytes, little-endian)
+ *
+ * Response wire layout (8 bytes total):
+ *   [0]    PID = 0xFF
+ *   [1]    checksum_type (XCP_ADD_44 = 0x06)
+ *   [2..3] reserved (zero)
+ *   [4..7] checksum (4 bytes, little-endian)
+ *
+ * Side-effect: MTA auto-increments by block_size on success.
+ *
+ * Implementation note: Tethys currently advertises only the XCP_ADD_44
+ * algorithm (simple running 32-bit sum). CRC-32 variants will be added
+ * in the space-profile work at Phase 8 - see research note D17.
+ *
+ * @return number of bytes written to @p response.
+ */
+static size_t handle_build_checksum(
+    tethys_xcp_state_t* state,
+    uint8_t const*      request,
+    size_t              req_len,
+    uint8_t*            response,
+    size_t              resp_cap)
+{
+    if (!state->connected) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (state->memory == NULL) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_ACCESS_DENIED);
+    }
+    if (req_len < (size_t)8U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    uint32_t const block_size = decode_u32_le(&request[4]);
+    if (block_size == (uint32_t)0U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    if (!memory_span_ok(state, state->mta_address, (size_t)block_size)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    if (resp_cap < (size_t)8U) {
+        return (size_t)0U;
+    }
+    uint32_t const checksum = add_44_checksum(state->memory, state->mta_address, block_size);
+    response[0] = TETHYS_XCP_PID_RES;
+    response[1] = TETHYS_XCP_CHECKSUM_ADD_44;
+    response[2] = (uint8_t)0U; /* reserved */
+    response[3] = (uint8_t)0U; /* reserved */
+    response[4] = (uint8_t)(checksum & 0xFFU);
+    response[5] = (uint8_t)((checksum >> 8U) & 0xFFU);
+    response[6] = (uint8_t)((checksum >> 16U) & 0xFFU);
+    response[7] = (uint8_t)((checksum >> 24U) & 0xFFU);
+    state->mta_address += block_size;
+    return (size_t)8U;
+}
+
+/**
+ * @brief Handle SYNCH (0xFC).
+ *
+ * Wire layout (XCP 1.4 Part 2 §1.3.1.2):
+ *   [0] PID = 0xFC
+ *
+ * Per spec the slave ALWAYS responds with ERR_CMD_SYNCH (0x00) to mark the
+ * end of any pending command sequence. This is NOT an error condition; it
+ * is the documented contract for protocol state-machine resync.
+ *
+ * @return 2 (ERR PID + error code).
+ */
+static size_t handle_synch(uint8_t* response, size_t resp_cap)
+{
+    return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNCH);
+}
+
 /* ---- Public API ------------------------------------------------------- */
 
 void tethys_xcp_init(tethys_xcp_state_t* state)
@@ -366,6 +511,15 @@ int tethys_xcp_dispatch(
     }
     else if (cmd == TETHYS_XCP_CMD_SHORT_UPLOAD) {
         written = handle_short_upload(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_DOWNLOAD) {
+        written = handle_download(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_BUILD_CHECKSUM) {
+        written = handle_build_checksum(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_SYNCH) {
+        written = handle_synch(response, resp_cap);
     }
     else {
         written = write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);

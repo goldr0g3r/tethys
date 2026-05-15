@@ -121,7 +121,12 @@
 # and release collections. Usually it's better to use paths and let
 # Ceedling do the work for you!
 :files:
-  :test: []
+  :test:
+    # test_aes128_local_verify.c is a stand-alone main() for dev sanity-
+    # checking AES + EDAC outside Ceedling (compiled directly with gcc per
+    # its file header). Exclude from the Unity test runner to avoid the
+    # duplicate-main link error.
+    - -:test/test_aes128_local_verify.c
   :source: []
 
 # Compilation symbols to be injected into builds

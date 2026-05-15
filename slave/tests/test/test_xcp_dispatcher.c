@@ -431,3 +431,182 @@ void test_short_upload_succeeds_and_leaves_mta_unchanged(void)
     TEST_ASSERT_EQUAL_UINT8(0x22U, g_response[3]);
     TEST_ASSERT_EQUAL_UINT32(0x55U, g_state.mta_address); /* unchanged */
 }
+
+/* -------- DOWNLOAD ---------------------------------------------------- */
+
+void test_download_before_connect_denied(void)
+{
+    uint8_t req[3] = {TETHYS_XCP_CMD_DOWNLOAD, 1U, 0xAAU};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_ACCESS_DENIED, g_response[1]);
+}
+
+void test_download_with_no_memory_attached_denied(void)
+{
+    do_connect();
+    tethys_xcp_attach_memory(&g_state, NULL, 0U);
+    uint8_t req[3] = {TETHYS_XCP_CMD_DOWNLOAD, 1U, 0xAAU};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_ACCESS_DENIED, g_response[1]);
+}
+
+void test_download_truncated_header_returns_syntax(void)
+{
+    do_connect();
+    uint8_t req[1] = {TETHYS_XCP_CMD_DOWNLOAD};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_CMD_SYNTAX, g_response[1]);
+}
+
+void test_download_missing_payload_returns_syntax(void)
+{
+    do_connect();
+    /* Declares 4 bytes but only ships 2 actual payload bytes (req_len = 2+2 = 4 < 2+4 = 6). */
+    uint8_t req[4] = {TETHYS_XCP_CMD_DOWNLOAD, 4U, 0xAAU, 0xBBU};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_CMD_SYNTAX, g_response[1]);
+}
+
+void test_download_zero_bytes_returns_out_of_range(void)
+{
+    do_connect();
+    uint8_t req[2] = {TETHYS_XCP_CMD_DOWNLOAD, 0U};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_OUT_OF_RANGE, g_response[1]);
+}
+
+void test_download_too_many_bytes_returns_out_of_range(void)
+{
+    do_connect();
+    /* MAX_CTO=8, so max payload = MAX_CTO-2 = 6. Requesting 7 is out of range. */
+    uint8_t req[9] = {TETHYS_XCP_CMD_DOWNLOAD, 7U, 0x01U, 0x02U, 0x03U, 0x04U, 0x05U, 0x06U, 0x07U};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_OUT_OF_RANGE, g_response[1]);
+}
+
+void test_download_outside_attached_memory_returns_out_of_range(void)
+{
+    do_connect();
+    g_state.mta_address = (uint32_t)(TEST_MEMORY_SIZE - 2U);
+    uint8_t req[6] = {TETHYS_XCP_CMD_DOWNLOAD, 4U, 0xAAU, 0xBBU, 0xCCU, 0xDDU};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_OUT_OF_RANGE, g_response[1]);
+}
+
+void test_download_succeeds_and_increments_mta(void)
+{
+    do_connect();
+    g_state.mta_address = 0x40U;
+    uint8_t req[6] = {TETHYS_XCP_CMD_DOWNLOAD, 4U, 0xDEU, 0xADU, 0xBEU, 0xEFU};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_size_t(1U, g_response_len);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_RES, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(0xDEU, g_memory[0x40U]);
+    TEST_ASSERT_EQUAL_UINT8(0xADU, g_memory[0x41U]);
+    TEST_ASSERT_EQUAL_UINT8(0xBEU, g_memory[0x42U]);
+    TEST_ASSERT_EQUAL_UINT8(0xEFU, g_memory[0x43U]);
+    TEST_ASSERT_EQUAL_UINT32(0x44U, g_state.mta_address);
+}
+
+/* -------- BUILD_CHECKSUM --------------------------------------------- */
+
+void test_build_checksum_before_connect_denied(void)
+{
+    uint8_t req[8] = {TETHYS_XCP_CMD_BUILD_CHECKSUM, 0U, 0U, 0U, 0x10U, 0U, 0U, 0U};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_ACCESS_DENIED, g_response[1]);
+}
+
+void test_build_checksum_zero_block_returns_out_of_range(void)
+{
+    do_connect();
+    uint8_t req[8] = {TETHYS_XCP_CMD_BUILD_CHECKSUM, 0U, 0U, 0U, 0U, 0U, 0U, 0U};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_OUT_OF_RANGE, g_response[1]);
+}
+
+void test_build_checksum_outside_memory_returns_out_of_range(void)
+{
+    do_connect();
+    g_state.mta_address = (uint32_t)(TEST_MEMORY_SIZE - 4U);
+    uint8_t req[8] = {TETHYS_XCP_CMD_BUILD_CHECKSUM, 0U, 0U, 0U,
+                      0x10U, 0x00U, 0x00U, 0x00U}; /* 16 bytes, past the end */
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_OUT_OF_RANGE, g_response[1]);
+}
+
+void test_build_checksum_truncated_request_returns_syntax(void)
+{
+    do_connect();
+    uint8_t req[5] = {TETHYS_XCP_CMD_BUILD_CHECKSUM, 0U, 0U, 0U, 0x10U};
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_CMD_SYNTAX, g_response[1]);
+}
+
+void test_build_checksum_succeeds_and_advances_mta(void)
+{
+    do_connect();
+    g_state.mta_address = 0x10U;
+    /* Sum of ramp bytes at offsets 0x10..0x13 = 0x10+0x11+0x12+0x13 = 0x46. */
+    uint8_t req[8] = {TETHYS_XCP_CMD_BUILD_CHECKSUM, 0U, 0U, 0U,
+                      0x04U, 0x00U, 0x00U, 0x00U}; /* block_size = 4 */
+    int rc = tethys_xcp_dispatch(&g_state, req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_size_t(8U, g_response_len);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_RES, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_CHECKSUM_ADD_44, g_response[1]);
+    /* Little-endian u32 of 0x46. */
+    TEST_ASSERT_EQUAL_UINT8(0x46U, g_response[4]);
+    TEST_ASSERT_EQUAL_UINT8(0x00U, g_response[5]);
+    TEST_ASSERT_EQUAL_UINT8(0x00U, g_response[6]);
+    TEST_ASSERT_EQUAL_UINT8(0x00U, g_response[7]);
+    TEST_ASSERT_EQUAL_UINT32(0x14U, g_state.mta_address);
+}
+
+/* -------- SYNCH ------------------------------------------------------- */
+
+void test_synch_returns_err_cmd_synch_even_before_connect(void)
+{
+    /* SYNCH is allowed in any state - it is the state-machine reset signal. */
+    uint8_t req = TETHYS_XCP_CMD_SYNCH;
+    int rc = tethys_xcp_dispatch(&g_state, &req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_size_t(2U, g_response_len);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_CMD_SYNCH, g_response[1]);
+}
+
+void test_synch_after_connect_still_returns_err_cmd_synch(void)
+{
+    do_connect();
+    uint8_t req = TETHYS_XCP_CMD_SYNCH;
+    int rc = tethys_xcp_dispatch(&g_state, &req, sizeof req, g_response, sizeof g_response, &g_response_len);
+    TEST_ASSERT_EQUAL_INT(0, rc);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_PID_ERR, g_response[0]);
+    TEST_ASSERT_EQUAL_UINT8(TETHYS_XCP_ERR_CMD_SYNCH, g_response[1]);
+    /* Session stays connected; SYNCH does not implicitly disconnect. */
+    TEST_ASSERT_TRUE(g_state.connected);
+}

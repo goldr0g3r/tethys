@@ -1,11 +1,11 @@
 /*
- * tethys/xcp_dispatcher.h - XCP command dispatcher (Phase 1 + Phase 2 read path).
+ * tethys/xcp_dispatcher.h - XCP command dispatcher (Phase 1 + Phase 2).
  *
  * Module: tethys::core::xcp_dispatcher
  * Profiles: all (marine, space, posix-sim)
- * Standards: ASAM XCP 1.4 Part 2 §1.3.2 + §1.3.3 + §1.4.2.1;
+ * Standards: ASAM XCP 1.4 Part 2 §1.3.1..§1.3.4 + §1.4.2.1 + §1.5;
  *            MISRA C:2023; ECSS-E-ST-40C Rev.1 §5.4
- * Trace: docs/traceability.csv (rows TETHYS-DES-0001..0007 land at PR-10)
+ * Trace: docs/traceability.csv (rows TETHYS-DES-0001..0010 land at PR-10)
  *
  * Phase 1 commands:
  *   - CONNECT     (0xFF) - establish session
@@ -18,8 +18,12 @@
  *   - UPLOAD        (0xF5) - upload N bytes from MTA (auto-increment)
  *   - SHORT_UPLOAD  (0xF4) - upload N bytes from given address (stateless)
  *
+ * Phase 2 write/checksum/sync commands (PR-29):
+ *   - DOWNLOAD        (0xF0) - write N bytes at MTA (auto-increment)
+ *   - BUILD_CHECKSUM  (0xF3) - sum block_size bytes from MTA (auto-increment)
+ *   - SYNCH           (0xFC) - protocol state-machine reset (returns ERR_CMD_SYNCH)
+ *
  * Out of scope (deferred):
- *   - DOWNLOAD / BUILD_CHECKSUM / SYNCH (Phase 2 PR-29)
  *   - A2L MEASUREMENT/CHARACTERISTIC parse (Phase 2 PR-30)
  *   - DAQ_LIST / STIM / CAL (Phase 3 + 4)
  *
@@ -49,14 +53,28 @@ extern "C" {
 #define TETHYS_XCP_MAX_DTO   ((uint16_t)256U)
 
 /** XCP Standard Command codes (subset; XCP 1.4 Part 2 Table 5). */
-#define TETHYS_XCP_CMD_CONNECT       ((uint8_t)0xFFU)
-#define TETHYS_XCP_CMD_DISCONNECT    ((uint8_t)0xFEU)
-#define TETHYS_XCP_CMD_GET_STATUS    ((uint8_t)0xFDU)
-#define TETHYS_XCP_CMD_SYNCH         ((uint8_t)0xFCU)
-#define TETHYS_XCP_CMD_GET_VERSION   ((uint8_t)0xC0U)
-#define TETHYS_XCP_CMD_SET_MTA       ((uint8_t)0xF6U)
-#define TETHYS_XCP_CMD_UPLOAD        ((uint8_t)0xF5U)
-#define TETHYS_XCP_CMD_SHORT_UPLOAD  ((uint8_t)0xF4U)
+#define TETHYS_XCP_CMD_CONNECT          ((uint8_t)0xFFU)
+#define TETHYS_XCP_CMD_DISCONNECT       ((uint8_t)0xFEU)
+#define TETHYS_XCP_CMD_GET_STATUS       ((uint8_t)0xFDU)
+#define TETHYS_XCP_CMD_SYNCH            ((uint8_t)0xFCU)
+#define TETHYS_XCP_CMD_GET_VERSION      ((uint8_t)0xC0U)
+#define TETHYS_XCP_CMD_SET_MTA          ((uint8_t)0xF6U)
+#define TETHYS_XCP_CMD_UPLOAD           ((uint8_t)0xF5U)
+#define TETHYS_XCP_CMD_SHORT_UPLOAD     ((uint8_t)0xF4U)
+#define TETHYS_XCP_CMD_BUILD_CHECKSUM   ((uint8_t)0xF3U)
+#define TETHYS_XCP_CMD_DOWNLOAD         ((uint8_t)0xF0U)
+
+/** BUILD_CHECKSUM checksum-type codes (XCP 1.4 Part 2 §1.5 Table 11; subset). */
+#define TETHYS_XCP_CHECKSUM_ADD_11   ((uint8_t)0x01U)
+#define TETHYS_XCP_CHECKSUM_ADD_12   ((uint8_t)0x02U)
+#define TETHYS_XCP_CHECKSUM_ADD_14   ((uint8_t)0x03U)
+#define TETHYS_XCP_CHECKSUM_ADD_22   ((uint8_t)0x04U)
+#define TETHYS_XCP_CHECKSUM_ADD_24   ((uint8_t)0x05U)
+#define TETHYS_XCP_CHECKSUM_ADD_44   ((uint8_t)0x06U)
+#define TETHYS_XCP_CHECKSUM_CRC_16   ((uint8_t)0x07U)
+#define TETHYS_XCP_CHECKSUM_CRC_16_CITT ((uint8_t)0x08U)
+#define TETHYS_XCP_CHECKSUM_CRC_32   ((uint8_t)0x09U)
+#define TETHYS_XCP_CHECKSUM_USER     ((uint8_t)0xFFU)
 
 /** Packet IDs (first byte of any response packet; XCP 1.4 Part 2 §3.1). */
 #define TETHYS_XCP_PID_RES   ((uint8_t)0xFFU)
