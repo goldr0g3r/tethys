@@ -211,7 +211,20 @@ transparently.
 
 ## Implementation Reference
 
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
+- PR: [#22 feat(slave): phase 1 shared infrastructure](https://github.com/goldr0g3r/tethys/pull/22)
+- Merged on: 2026-05-15 (squash-merged via `gh pr merge 22 --squash --delete-branch` - first PR
+  to merge through the full 7-required-context branch protection contract WITHOUT --admin).
+- Merge SHA: `8ff2d2b`.
 - Acceptance bench result: CONNECT/DISCONNECT round-trip < 1 ms wall-clock
   on UDP loopback (target: <50 ms). All 49 tests green.
+- Fast-follow fix commits on the same PR branch:
+  - `15709cf` `fix(deps): bump pytest to 9.0.3 + pytest-asyncio to 1.3.0 (CVE-2025-71176)`
+    - GitHub Dependabot detected CVE-2025-71176 (GHSA-6w46-j5rx-g56g) in pytest 8.3.3 tmpdir
+      handling; fixed in pytest 9.0.3 which requires pytest-asyncio >= 1.3.0.
+  - `ead1464` `ci(deps): switch dependency-review from allow-list to deny-list`
+    - The allow-license list cannot match compound SPDX `BSD-2-Clause AND BSD-3-Clause`
+      identifiers (legitimately used by colorama, packaging). Switched to deny-list of
+      proprietary / non-commercial licenses per ADR-0008 free-tool-only intent.
+  - `8500ffd` `ci(deps): drop non-SPDX Commons-Clause + ELv2 from deny-licenses list`
+    - The action rejects deny entries that are not valid SPDX identifiers.
+- All 19 CI status checks pass on the final commit; merged via standard squash (no --admin).
