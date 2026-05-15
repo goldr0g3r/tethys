@@ -1,0 +1,32 @@
+# Tethys cppcheck baseline suppression list.
+# Cite: cppcheck manual section "Suppressions".
+# Cite: ADR-0003 (MISRA C:2023 as the coding gate).
+#
+# Format: one suppression per line.
+#   <id>:<file>:<line>     - per-line / per-file
+#   <id>                   - project-wide (use sparingly)
+#
+# Day-zero list (matches the empty docs/misra-deviations.md register).
+# Each entry must have a corresponding row in docs/misra-deviations.md OR be a
+# documented project-wide pragma (the four below).
+
+# cppcheck cannot resolve every translation unit without a full compile-commands
+# database. We accept missing-include warnings for headers that are intentionally
+# not visible at lint time (vendor SDK headers; arch-specific HAL).
+missingIncludeSystem
+
+# cppcheck false-positive for static const arrays that are intentionally module-
+# private. We use clang-tidy and -Wall to catch the real cases.
+unusedStructMember
+
+# cppcheck's `--check-config` is a separate pass; suppress its informational
+# output during the main pass.
+checkLibraryNoReturn
+checkLibraryFunction
+
+# Project-wide rule deviations - **NONE on day-zero**. Future per-rule
+# suppressions go here with the format:
+#
+#   misra-c2023-N.M:slave/src/core/foo.c:42
+#
+# and a matching entry in docs/misra-deviations.md.
