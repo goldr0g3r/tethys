@@ -20,7 +20,8 @@ permissions:
   contents: read
 
 jobs:
-  roundtrip:
+  a2l-roundtrip:
+    name: a2l-roundtrip (parse-emit-parse)
     runs-on: ubuntu-latest
     defaults:
       run:

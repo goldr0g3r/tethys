@@ -26,6 +26,9 @@ todos:
   - id: p0-layout
     content: "Phase 0 / PR-1b chore(layout): rebrand slave -> tethys (CMake project + target + alias + install rules); slave/include/slave/slave.h -> slave/include/tethys/tethys.h; slave/source/slave.c -> slave/src/core/tethys.c; add CMakePresets.json `dev` configure preset for CI clang-tidy + gcc-fanalyzer. Resolves PR-1 follow-up F2 + half of F5 (CI preset)."
     status: completed
+  - id: p0-ci-fixes-f5
+    content: "Phase 0 / F5 follow-up ci: trufflehog --fail double + dependency-review repo-public flip + ci.yml YAML parse fix + 9-workflow job-id rename to canonical contexts (build / misra-gate / static-analysis / coverage / fuzz-smoke / secret-scan / dependency-review / a2l-roundtrip / pr-title) + re-tighten branch protection with the required-status-checks list."
+    status: completed
   - id: p0-github-setup-runbook
     content: "Phase 0 / PR-0a docs(runbook): docs/runbooks/github-setup.md — PAT scope spec, repo visibility (public), branch protection rules, Rulesets, CODEOWNERS, Projects v2 board creation with 4 custom fields (Phase / Workstream / Layer / Type), auto-add workflow, milestones bootstrap, label set bootstrap. Pre-requisite for p0-issues."
     status: completed

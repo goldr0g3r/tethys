@@ -12,14 +12,24 @@ permissions:
   pull-requests: write
 
 jobs:
-  review:
+  dependency-review:
+    name: dependency-review (licenses + CVEs)
     runs-on: ubuntu-latest
+    # Only runs on PR events with both a base and head ref - the action exits with
+    # an error if the repository hasn't been pushed to GitHub at least once or if
+    # Dependency Graph isn't enabled. For public free-tier repos, Dependency Graph
+    # is on by default.
+    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/dependency-review-action@3b139cfc5fae8b618d3eae3675e383bb1769c019 # v4.5.0
         with:
           fail-on-severity: moderate
           comment-summary-in-pr: on-failure
+          # On a fresh public repo without any pinned dependencies the action
+          # reports "no manifest changes". That is fine - the job still succeeds.
+          # GHAS premium features (paid) would add SCA / SCM analytics; not in
+          # scope per ADR-0008 free-tool-only.
           allow-licenses: >-
             MIT,
             Apache-2.0,

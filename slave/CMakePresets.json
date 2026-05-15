@@ -31,7 +31,7 @@
     },
     {
       "name": "dev",
-      "description": "Alias for ci-ubuntu - used by static-analysis.yml + gcc-fanalyzer jobs",
+      "description": "Alias for ci-ubuntu - used by static-analysis.yml + gcc-fanalyzer + ci.yml slave/posix jobs",
       "binaryDir": "${sourceDir}/build/dev",
       "inherits": ["ci-build", "ci-linux", "clang-tidy", "cppcheck", "dev-mode"]
     },
@@ -163,6 +163,39 @@
     {
       "name": "ci-windows",
       "inherits": ["ci-build", "ci-win64", "dev-mode", "ci-multi-config"]
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "description": "Build preset matching the dev configure preset (used by CI)"
+    },
+    {
+      "name": "ci-ubuntu",
+      "configurePreset": "ci-ubuntu"
+    },
+    {
+      "name": "ci-coverage",
+      "configurePreset": "ci-coverage"
+    },
+    {
+      "name": "ci-sanitize",
+      "configurePreset": "ci-sanitize"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "dev",
+      "configurePreset": "dev",
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "ignore"}
+    },
+    {
+      "name": "ci-ubuntu",
+      "configurePreset": "ci-ubuntu",
+      "output": {"outputOnFailure": true},
+      "execution": {"noTestsAction": "ignore"}
     }
   ]
 }

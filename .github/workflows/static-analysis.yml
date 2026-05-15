@@ -55,3 +55,18 @@ jobs:
           cd slave
           scan-build --status-bugs cmake --preset=dev || echo "scan-build: scaffolded"
           scan-build --status-bugs cmake --build --preset=dev || echo "scan-build: scaffolded"
+
+  # Single umbrella job whose ID maps to the parent §6.7 protection context "static-analysis".
+  static-analysis:
+    name: static-analysis (summary)
+    runs-on: ubuntu-latest
+    needs: [clang-tidy, gcc-fanalyzer, scan-build]
+    if: always()
+    steps:
+      - name: Aggregate static-analysis result
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::One or more static-analysis tools failed"
+            exit 1
+          fi
+          echo "clang-tidy + gcc-fanalyzer + scan-build all passed."

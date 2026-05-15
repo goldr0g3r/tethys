@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   slave-coverage:
-    name: slave / gcovr
+    name: coverage / slave (gcovr)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -33,11 +33,12 @@ jobs:
           cmake --preset=dev -DCMAKE_C_FLAGS="--coverage -O0 -g"
           cmake --build --preset=dev || true
       - name: Run tests
-        run: cd slave && ctest --preset=dev || echo "ctest: no tests yet"
+        run: 'cd slave && ctest --preset=dev || echo "ctest scaffolded - no tests yet"'
       - name: gcovr report
         run: |
           cd slave
-          gcovr --root . --print-summary --filter 'src/core/' --xml-pretty -o coverage.xml || echo "gcovr: nothing to cover yet"
+          gcovr --root . --print-summary --filter 'src/core/' --xml-pretty -o coverage.xml \
+            || echo "gcovr scaffolded - nothing to cover yet"
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
@@ -57,9 +58,13 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
       - run: uv sync --no-progress
-      - run: uv run coverage run -m pytest || echo "coverage.py: no tests yet"
-      - run: uv run coverage report --show-missing || echo "coverage.py: no data yet"
-      - run: uv run coverage xml || true
+      - run: |
+          uv run --with coverage --with pytest coverage run -m pytest \
+            || echo "coverage.py scaffolded - no tests yet"
+      - run: |
+          uv run --with coverage coverage report --show-missing \
+            || echo "coverage.py scaffolded - no data yet"
+      - run: uv run --with coverage coverage xml || true
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
@@ -68,3 +73,18 @@ jobs:
           path: master/coverage.xml
           retention-days: 30
           if-no-files-found: ignore
+
+  # Single umbrella job whose ID maps to the parent §6.7 protection context "coverage".
+  coverage:
+    name: coverage (summary)
+    runs-on: ubuntu-latest
+    needs: [slave-coverage, master-coverage]
+    if: always()
+    steps:
+      - name: Aggregate coverage result
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::Coverage job failed"
+            exit 1
+          fi
+          echo "slave + master coverage runs completed."
