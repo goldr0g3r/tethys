@@ -37,12 +37,17 @@ set_property(CACHE TETHYS_PLATFORM PROPERTY STRINGS
 #
 # Source files live under src/{core,transport,platform}/ per parent plan §14.
 # Phase 1 adds the XCP dispatcher under src/core/; Phase 2+ adds DAQ, CAL,
-# transport modules. Phase 7+8 (foundation) adds the platform sources via the
-# profile cmake files.
+# transport modules. Phase 5 adds the TAL (transport.c) plus the loopback
+# and SocketCAN concrete transports; SocketCAN compiles to a stub on
+# non-Linux hosts (see slave/src/transport/socketcan.c). Phase 7+8
+# (foundation) adds the platform sources via the profile cmake files.
 add_library(
     tethys_slave
     src/core/tethys.c
     src/core/xcp_dispatcher.c
+    src/transport/transport.c
+    src/transport/loopback.c
+    src/transport/socketcan.c
 )
 add_library(tethys::slave ALIAS tethys_slave)
 
