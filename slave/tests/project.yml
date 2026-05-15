@@ -98,9 +98,14 @@
 # Tests live in slave/tests/test/, sources in slave/src/, public headers in
 # slave/include/. Ceedling runs from slave/tests/ so all paths are relative
 # to that directory.
+#
+# slave/tests/robustness/ holds the Phase-10 fault-injection catalogue
+# (one test per row in ADR-0010 §10.1). Discovered via the +:robustness/**
+# glob alongside the standard +:test/** glob (Worker D PR-B).
 :paths:
   :test:
     - +:test/**
+    - +:robustness/**
     - -:test/support
   :source:
     - ../src/**

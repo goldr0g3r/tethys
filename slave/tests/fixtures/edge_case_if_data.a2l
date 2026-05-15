@@ -1,0 +1,96 @@
+/* Tethys Phase-10 verification fixture: edge-case A2L file.
+
+   Exercises the parser's _skip_block / _find_end recursion paths via
+   deeply-nested IF_DATA blocks, inline /* ... */ and // comments inside
+   blocks, and one MEASUREMENT + one CHARACTERISTIC surrounded by
+   unsupported (silently skipped) constructs:
+     - RECORD_LAYOUT
+     - COMPU_METHOD
+     - COMPU_VTAB
+     - IF_DATA XCP {  IF_DATA CAN {  IF_DATA TP_BLOB { ... } } }
+       (3-deep nest with one inner block that has its own matching /end)
+     - block comments / line comments INSIDE a MEASUREMENT body
+
+   Used by:
+     - .github/workflows/a2l-roundtrip.yml (parse -> emit -> parse;
+       canonical emitter strips IF_DATA, so the round-trip surface here is
+       the projection onto the supported subset)
+     - master/tests/test_a2l.py negative + happy-path tests
+     - slave/fuzz/corpus/a2l/ seed (catches mutation that breaks skip_block)
+
+   Standards: ASAM MCD-2 MC v1.7 §3 (lexical structure); §4.4.1 PROJECT;
+              §4.4.2 MODULE; §4.4.10 CHARACTERISTIC; §4.4.18 MEASUREMENT.
+   Trace: docs/traceability.csv row TETHYS-DES-0011 + TETHYS-REQ-VER-003.
+*/
+/begin PROJECT tethys_edge_case "Tethys deeply-nested IF_DATA edge case"
+  /begin MODULE edge_mod "Edge-case parser stress"
+    /* --- An unsupported COMPU_METHOD block we expect the parser to skip --- */
+    /begin COMPU_METHOD identity_conv
+      "Identity conversion (skipped by Phase-2 parser)"
+      RAT_FUNC
+      "%6.3"
+      "unit"
+      COEFFS 0.0 1.0 0.0 0.0 0.0 1.0
+    /end COMPU_METHOD
+    /* --- An unsupported COMPU_VTAB block we expect the parser to skip --- */
+    /begin COMPU_VTAB fault_vtab
+      "Demo enum table"
+      TAB_VERB
+      3
+      0 "OK"
+      1 "WARN"
+      2 "FAULT"
+    /end COMPU_VTAB
+    /* --- An unsupported RECORD_LAYOUT --- */
+    /begin RECORD_LAYOUT SCALAR_RL
+      FNC_VALUES 1 SWORD COLUMN_DIR DIRECT
+    /end RECORD_LAYOUT
+    /begin MEASUREMENT
+      // line comment inside a measurement; parser must keep parsing
+      buried_signal
+      "Signal surrounded by skipped blocks"
+      SWORD
+      identity_conv
+      1
+      /* block comment inside the MEASUREMENT body */
+      1.0
+      -32768.0
+      32767.0
+      ECU_ADDRESS 0x20000300
+      /* --- Deeply nested IF_DATA inside a MEASUREMENT --- */
+      /begin IF_DATA XCP
+        /begin DAQ_EVENT FIXED
+          "EVT_BURIED"
+          0x0001
+          /begin AVAILABLE_EVENT_LIST
+            EVENT 0x0001
+          /end AVAILABLE_EVENT_LIST
+        /end DAQ_EVENT
+        /begin SEGMENT 0x01 1 0 0 0
+          /begin PAGE 0x00 ECU_ACCESS_WITH_XCP_ONLY XCP_READ_ACCESS_WITHOUT_ECU_XCP XCP_WRITE_ACCESS_NOT_ALLOWED
+          /end PAGE
+        /end SEGMENT
+      /end IF_DATA
+    /end MEASUREMENT
+    /begin CHARACTERISTIC
+      buried_constant
+      "Calibration constant surrounded by IF_DATA"
+      VALUE
+      0x20000400
+      SCALAR_RL
+      0.0
+      identity_conv
+      0.0
+      255.0
+      /* --- Even deeper nest (3 levels of IF_DATA) --- */
+      /begin IF_DATA XCP
+        /begin IF_DATA CAN
+          /begin IF_DATA TP_BLOB
+            BIT_RATE 500000
+            SAMPLE_POINT 75
+          /end IF_DATA
+        /end IF_DATA
+      /end IF_DATA
+    /end CHARACTERISTIC
+  /end MODULE
+/end PROJECT

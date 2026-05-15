@@ -1,0 +1,39 @@
+/* Tethys Phase-10 verification fixture: trivial A2L file.
+
+   Smallest valid A2L file Tethys understands: PROJECT + MODULE
+   + 1 MEASUREMENT + 1 CHARACTERISTIC. Used by:
+     - .github/workflows/a2l-roundtrip.yml (parse -> emit -> parse)
+     - master/tests/test_a2l.py round-trip equivalence
+     - slave/fuzz/corpus/a2l/ seed for the atheris harness
+     - Phase-6 GUI tree-view smoke (TODO Phase 6)
+
+   Standards: ASAM MCD-2 MC v1.7 §4.4.1 PROJECT; §4.4.2 MODULE;
+              §4.4.10 CHARACTERISTIC; §4.4.18 MEASUREMENT.
+   Trace: docs/traceability.csv row TETHYS-DES-0011 + TETHYS-REQ-VER-003.
+*/
+/begin PROJECT tethys_trivial "Tethys trivial single-measurement fixture"
+  /begin MODULE trivial_mod "Single measurement and characteristic"
+    /begin MEASUREMENT
+      sample_signal
+      "Demo unsigned 16-bit signal"
+      UWORD
+      identity_conv
+      1
+      0.5
+      0.0
+      65535.0
+      ECU_ADDRESS 0x20000100
+    /end MEASUREMENT
+    /begin CHARACTERISTIC
+      sample_constant
+      "Demo scalar calibration constant"
+      VALUE
+      0x20000200
+      SCALAR_RL
+      0.0
+      identity_conv
+      0.0
+      100.0
+    /end CHARACTERISTIC
+  /end MODULE
+/end PROJECT
