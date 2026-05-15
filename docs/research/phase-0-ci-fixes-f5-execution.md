@@ -149,9 +149,21 @@ Cost: 0 USD (GitHub free tier on public repos).
 
 ## Implementation Reference
 
-- PR: *to be filled at merge*
-- Merged on: *to be filled at merge*
-- Branch protection state after PR merge: *7 required contexts*: `build`,
-  `misra-gate`, `static-analysis`, `coverage`, `secret-scan`,
-  `dependency-review`, `pr-title`. `enforce_admins=true`. Linear-history +
+- PR: [#19 ci: workflow job rename to canonical contexts + trufflehog fix + ci.yml YAML fix + dependency-review hardening](https://github.com/goldr0g3r/tethys/pull/19)
+- Merged on: 2026-05-15 (squash-merged via `gh pr merge 19 --squash --admin --delete-branch`).
+- Merge SHA: see `main` log immediately after PR #19.
+- Branch protection state after PR merge: **7 required contexts** -
+  `build (summary)`, `misra-gate (cppcheck-misra)`,
+  `static-analysis (summary)`, `coverage (summary)`,
+  `secret-scan (trufflehog)`, `dependency-review (licenses + CVEs)`,
+  `pr-title (conventional-commits)`. `enforce_admins=true`. Linear-history +
   conversation-resolution required. Force-push + deletion blocked.
+- Repo visibility: **public** (flipped earlier in the same session via
+  `gh repo edit --visibility public`).
+- Secondary security toggles enabled in the same step: `secret_scanning`,
+  `secret_scanning_push_protection`, `dependabot_security_updates`.
+- CI green on the PR: 19/19 checks pass after the follow-up fix commit
+  (`ci: fix master/windows ruff/mypy/pytest install + slave/posix dev build preset`)
+  added `uv run --with <tool>` patterns for master/simulator/coverage.py
+  jobs and added `buildPresets` + `testPresets` aliases to
+  `slave/CMakePresets.json`.
