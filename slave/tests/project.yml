@@ -107,6 +107,7 @@
   :include:
     - ../include/**
     - ../src/**
+    - test/support
   :support:
     - test/support
   :libraries: []

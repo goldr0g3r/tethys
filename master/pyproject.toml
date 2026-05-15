@@ -1,16 +1,118 @@
 [project]
 name = "tethys-master"
 version = "0.1.0"
-description = "Add your description here"
+description = "Tethys XCP master tool - license-free PC-side XCP 1.4 calibration + measurement (marine + space profiles)"
+readme = "README.md"
+license = { text = "MIT" }
 authors = [
-    { name = "Anandhu Prakash", email = "wnp1cob@bosch.com" }
+    { name = "Tethys contributors", email = "tethys-master@example.com" },
 ]
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.11"
+keywords = ["xcp", "asam", "calibration", "measurement", "marine", "space", "ecss", "iacs"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Embedded Systems",
+]
+
+# Pinned per .cursor/rules/version-pinning.mdc - every dep exact version.
+# Renovate / Dependabot manage upgrades via PR.
+dependencies = [
+    "click==8.1.7",
+    "pydantic==2.9.2",
+    "pydantic-settings==2.6.1",
+    "structlog==24.4.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "mypy==1.13.0",
+    "pytest==8.3.3",
+    "pytest-asyncio==0.24.0",
+    "pytest-cov==6.0.0",
+    "ruff==0.7.4",
+]
 
 [project.scripts]
-tethys-master = "tethys_master:main"
+tethys-master = "tethys_master.cli:cli"
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]
 build-backend = "uv_build"
+
+[tool.uv_build]
+include = ["src/tethys_master/py.typed"]
+
+# ---- Tool configuration ----
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "F", "I",  # pycodestyle, pyflakes, isort
+    "B",            # flake8-bugbear
+    "UP",           # pyupgrade
+    "S",            # flake8-bandit
+    "PL",           # pylint
+    "RUF",          # ruff-specific
+]
+ignore = [
+    "PLR0913",      # too many arguments to function (XCP frames need them)
+    "PLR2004",      # magic value comparison (protocol constants)
+    "S101",         # assert (allowed in tests)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "PLR2004"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_any_generics = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers --strict-config"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: integration test requiring loopback transport",
+]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+branch = true
+source = ["src/tethys_master"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+show_missing = true
+skip_covered = false
