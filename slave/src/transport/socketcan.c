@@ -25,6 +25,16 @@
  *
  * Copyright (c) 2026 Tethys contributors. SPDX-License-Identifier: MIT.
  */
+#if defined(__linux__) && !defined(TETHYS_NO_SOCKETCAN)
+/* `struct ifreq`, `IFNAMSIZ`, and the BSD socket extras live in glibc only
+ * when one of the BSD / SVID feature-test macros is defined. With strict
+ * `-std=c11` (which we compile under), neither is implicit. Define
+ * `_DEFAULT_SOURCE` BEFORE any include so glibc exposes the kernel ABI we
+ * need for SocketCAN. POSIX-only headers (`sys/socket.h`, `poll.h`) are
+ * unaffected. */
+#  define _DEFAULT_SOURCE 1
+#endif
+
 #include "tethys/transport_socketcan.h"
 
 #include <stddef.h>
@@ -38,16 +48,19 @@
 #endif
 
 #if TETHYS_SOCKETCAN_LINUX
-#  include <errno.h>
-#  include <fcntl.h>
+/* Order matters: <sys/socket.h> defines `sa_family_t` which <net/if.h>
+ * depends on; <net/if.h> defines `struct ifreq` + `IFNAMSIZ` (gated by the
+ * feature-test macro above); <sys/ioctl.h> brings `SIOCGIFINDEX`. The
+ * Linux-specific linux/can headers must come AFTER <net/if.h> so they
+ * don't double-declare. */
+#  include <sys/socket.h>
+#  include <net/if.h>
+#  include <sys/ioctl.h>
+#  include <poll.h>
+#  include <unistd.h>
 #  include <linux/can.h>
 #  include <linux/can/error.h>
 #  include <linux/can/raw.h>
-#  include <net/if.h>
-#  include <poll.h>
-#  include <sys/ioctl.h>
-#  include <sys/socket.h>
-#  include <unistd.h>
 #endif
 
 /* ---- File-scope state (all profiles) ---------------------------------- */
