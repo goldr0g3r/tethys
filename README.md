@@ -125,6 +125,12 @@ ceedling test:all   # 18 tests pass
 
 Test totals after Phase 1: **49 tests passing** (23 master + 8 simulator + 18 slave).
 
+## Learn
+
+Long-form explainers that build from "I've never heard of this" to "I can read the ADRs and understand the trade-offs". See [`docs/learn/README.md`](docs/learn/README.md) for the full index. Currently:
+
+- [`xcp-101.md`](docs/learn/xcp-101.md) - XCP from first principles for an engineer who has never seen it before; master/slave, A2L, CTO/DTO, DAQ/ODT, CAL/PAG, STIM, transports, seed-and-key, loss handling, full session walk-through, glossary.
+
 ## Architecture Decision Records (ADRs)
 
 Tethys uses [MADR v3.0](https://adr.github.io/madr/). See [`docs/adr/README.md`](docs/adr/README.md) for the full index. Currently:

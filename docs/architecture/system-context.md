@@ -1,5 +1,7 @@
 # System context — Tethys
 
+> New to XCP? Start at [`docs/learn/xcp-101.md`](../learn/xcp-101.md) for a beginner's tour of the protocol, then return here for how Tethys puts it together.
+>
 > Expansion of parent plan §2 (system architecture). This document is the architectural reference; each cited [ADR](../adr/) records a specific decision.
 
 ## 1. Overview
