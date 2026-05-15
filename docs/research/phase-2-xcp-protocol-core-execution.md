@@ -48,28 +48,30 @@ decisions and tooling choices that propagate.
 | D16 | SET_MTA / UPLOAD response shape | SET_MTA: PID-only positive response (1 byte); UPLOAD / SHORT_UPLOAD: PID + N data bytes | Multi-byte SET_MTA response with echoed MTA (non-standard) | XCP 1.4 Part 2 §1.3.3.1 |
 | D17 (PR-29) | Checksum type default | `XCP_ADD_44` (running 32-bit sum) for marine; `XCP_CRC_32` for space profile (Polynomial 0x04C11DB7, IEEE 802.3) | CRC-CCITT-16 (too short for space-profile budget) | XCP 1.4 Part 2 §1.5 |
 | D18 (PR-29) | SYNCH semantics | Slave always returns `ERR_CMD_SYNCH` (0x00) per spec; master treats as a marker, not as a fatal error | Return positive RES (breaks state-machine reset) | XCP 1.4 Part 2 §1.3.1.2 |
-| D19 (PR-30) | A2L parser engine | `Sauci/pya2l` (BSD-3) wrapped in a Tethys-specific facade `tethys_master.protocol.a2l.A2LFile` | christoph2/pyA2L (GPLv2 - tighter copyleft would force `tethys-master` itself to LGPL/GPL); hand-rolled parser (~5000 LOC out of scope) | parent §3.1 |
+| D19 (PR-30) | A2L parser engine | **Hand-rolled minimal reader** in `tethys_master.protocol.a2l` (~300 LOC) that supports the MODULE / MEASUREMENT / CHARACTERISTIC subset Tethys needs today. Unknown blocks (COMPU_METHOD, COMPU_VTAB, RECORD_LAYOUT, IF_DATA, AXIS_DESCR, …) are silently skipped via `_skip_block`. Round-trip emitter is canonical (sorted, fixed formatting) so parse→emit→parse equality holds without preserving input whitespace. | (a) `Sauci/pya2l` (BSD-3) — 64 MB wheel + grpcio + grpcio-tools runtime dependency, heavy for Phase 2's needs; deferred to the Phase 6 GUI work where richer COMPU_METHOD / IF_DATA reads land. The `A2LFile` facade is designed as the swap point. (b) `christoph2/pyA2L` (GPLv2) — would force `tethys-master` itself to LGPL/GPL. | ASAM MCD-2 MC v1.7 §4.4.10 / §4.4.18; parent §3.1; ADR-0007 |
 | D20 (PR-31) | Differential test scope | Roundtrip CONNECT + SET_MTA + UPLOAD + SHORT_UPLOAD + DOWNLOAD + BUILD_CHECKSUM against the simulator slave; assert byte-identical CTO sequences between `tethys-master` and `pyxcp.master.Master` | Full DAQ comparison (Phase 3) | parent §8 Phase 2 acceptance |
 
 ## Implementation Reference
 
-- **PR-28**: *to be filled at merge - SET_MTA + UPLOAD + SHORT_UPLOAD*
-- **PR-29**: *to be filled at merge - DOWNLOAD + BUILD_CHECKSUM + SYNCH*
-- **PR-30**: *to be filled at merge - A2L parser facade*
-- **PR-31**: *to be filled at merge - differential test against pyxcp*
+- **PR-28** (SET_MTA + UPLOAD + SHORT_UPLOAD): merged on 2026-05-15 as squash commit `790e541`. 19 Unity tests + 18 master pytest cases. Caller-attached memory backend per D11.
+- **PR-29** (DOWNLOAD + BUILD_CHECKSUM + SYNCH): merged on 2026-05-15. +16 Unity + +15 master pytest cases. Completes the dispatcher half of the Phase 2 acceptance criterion (10 commands).
+- **PR-2C** (this PR — A2L parser facade): hand-rolled minimal reader per the revised D19. Validated against Worker D's 3 fixtures from PR #31 (`trivial`, `realistic`, `edge_case_if_data`); all 3 round-trip cleanly. 31 pytest cases (16 inline + 15 fixture-driven).
+- **PR-2D** (differential test against pyxcp): pending. Will pin `pyxcp==0.22.x` as a *dev* extra only, run side-by-side against the simulator slave, and assert byte-identical CTO sequences for the 10 commands covered through PR-29. Closes the Phase 2 acceptance criterion and flips `p2` → completed in the parent plan.
 
 ## Open follow-ups
 
-- `pyxcp` and `Sauci/pya2l` need pinning in `master/pyproject.toml`. PR-30 adds
-  `Sauci/pya2l==N.M.P` to runtime deps. PR-31 adds `pyxcp==0.22.x` to dev
-  deps only (differential test scaffolding, not a runtime dep - the Tethys
-  master is clean-room per D1 in PR-22's research note).
+- `Sauci/pya2l` is the long-term parser of choice per ADR-0007 but deferred to
+  the Phase 6 GUI work (D19 above). The `A2LFile` facade is the swap point;
+  callers depend on it, not on the parser internals.
+- `pyxcp` will be pinned in `master/pyproject.toml` `dev` extra by PR-2D for
+  the differential-test scaffolding. The Tethys master proper remains
+  clean-room per D1 in PR-22's research note.
 - Multi-CTO block-transfer mode for UPLOAD / DOWNLOAD reuses the DAQ ODT
-  machinery from Phase 3. Defer until then; document the gap in PR-30 if
+  machinery from Phase 3. Defer until then; document the gap in PR-2D if
   pyxcp's UPLOAD comparison surfaces it.
 - Coverage gate: parent §12 wants ≥95% statement + ≥90% MC/DC on the protocol
-  core by P2. `coverage.yml` already enforces this; PR-29 adds a `gcovr
-  --fail-under-branch` flag to catch regressions before they merge.
+  core by P2. `coverage.yml` already enforces this; PR-2D will add a
+  `gcovr --fail-under-branch` flag to catch regressions before they merge.
 - Frama-C/WP optional verification of the dispatcher's bounds checks is
-  parked for Phase 8 (space profile) - the ACSL contracts encode exactly the
+  parked for Phase 8 (space profile) — the ACSL contracts encode exactly the
   invariants D15 enforces with runtime checks.
