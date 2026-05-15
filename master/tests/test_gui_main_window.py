@@ -194,6 +194,78 @@ def test_record_daq_gap_updates_pane_diagnostics_and_status(window: MainWindow) 
     assert gaps_label.text() == "Gaps: 2"
 
 
+def test_calibration_mdf4_profile_docks_attached(window: MainWindow) -> None:
+    """PR-C: calibration + MDF4 + profile docks attach on construction."""
+    from PySide6.QtCore import Qt
+
+    cal_dock = window.calibration_dock()
+    mdf_dock = window.mdf4_dock()
+    prof_dock = window.profile_dock()
+    assert cal_dock.objectName() == "calibration_dock"
+    assert mdf_dock.objectName() == "mdf4_dock"
+    assert prof_dock.objectName() == "profile_dock"
+    # All three are right-area docks (tabified together).
+    for dock in (cal_dock, mdf_dock, prof_dock):
+        assert window.dockWidgetArea(dock) == Qt.DockWidgetArea.RightDockWidgetArea
+
+
+def test_view_menu_lists_all_five_dock_toggles(window: MainWindow) -> None:
+    """PR-C: View menu carries A2L + Diagnostics + Calibration + MDF4 + Profile toggles."""
+    menu_bar = window.menuBar()
+    assert menu_bar is not None
+    view_action = next(a for a in menu_bar.actions() if a.text().replace("&", "") == "View")
+    view_menu = view_action.menu()
+    assert view_menu is not None
+    toggle_names = {a.objectName() for a in view_menu.actions() if a.objectName()}
+    for expected in (
+        "action_view_a2l",
+        "action_view_diagnostics",
+        "action_view_calibration",
+        "action_view_mdf4",
+        "action_view_profile",
+    ):
+        assert expected in toggle_names
+
+
+def test_profile_change_updates_status_label(window: MainWindow) -> None:
+    """PR-C: switching profile updates the status-bar Profile label."""
+    from tethys_master.gui.profile_selector import Profile
+
+    window.profile_selector().set_profile(Profile.SPACE)
+    label = window._status_profile  # type: ignore[attr-defined]
+    assert label.text() == "Profile: space"
+
+
+def test_a2l_measurement_select_loads_characteristics_into_editor(
+    window: MainWindow,
+) -> None:
+    """PR-C: clicking a measurement also seeds the calibration editor."""
+    from tethys_master.protocol.a2l import A2LFile, Characteristic, CharacteristicType
+
+    a2l = A2LFile(
+        project_name="p",
+        project_long_identifier="",
+        module_name="m",
+        module_long_identifier="",
+        characteristics={
+            "k": Characteristic(
+                name="k",
+                long_identifier="",
+                characteristic_type=CharacteristicType.VALUE,
+                address=0x100,
+                record_layout="rl",
+                maxdiff=0.0,
+                conversion="",
+                lower_limit=0.0,
+                upper_limit=10.0,
+            )
+        },
+    )
+    window.a2l_tree().set_a2l(a2l)
+    window._on_a2l_measurement_selected("ignored")  # type: ignore[attr-defined]
+    assert window.calibration_editor().model().rowCount() == 1
+
+
 def test_show_about_dialog_does_not_crash(qtbot: QtBot, window: MainWindow, monkeypatch: pytest.MonkeyPatch) -> None:
     """``QMessageBox.about`` is modal; we intercept it to keep the test non-blocking."""
     from PySide6.QtWidgets import QMessageBox
