@@ -1,10 +1,18 @@
 name: fuzz-nightly
 
-# libFuzzer nightly fuzz per parent plan section 6.7 + ADR-0010 fault-injection catalogue.
-# Targets the XCP command parser (slave/src/core/cmd_dispatcher.c when it lands in Phase-2).
-# New crashes open issues automatically.
+# libFuzzer nightly fuzz per parent plan section 6.7 + ADR-0010 fault-injection
+# catalogue (specifically catalogue row 15 — malformed CTO PID byte / no UB).
+# Targets:
+#   1. slave/fuzz/fuzz_cto_dispatcher.c       — libFuzzer harness for
+#                                               tethys_xcp_dispatch().
+#   2. slave/fuzz/fuzz_a2l_parser.py          — atheris harness for
+#                                               tethys_master.protocol.a2l.
+# New crashes are surfaced as workflow artefacts; downstream issue-opening
+# automation is parked for the post-Phase-10 follow-up PR.
 #
-# Status: scaffolded. No fuzz harness or corpus today; Phase-2 onwards seeds slave/fuzz/.
+# Build strategy (Worker D PR-C): direct clang invocation, NOT
+# `cmake --preset=fuzz` (the fuzz preset lives in slave/CMakePresets.json
+# which is Worker E territory). Keeps the change inside test/CI scope.
 
 on:
   schedule:
@@ -16,37 +24,109 @@ permissions:
   issues: write
 
 jobs:
-  fuzz-smoke:
-    name: fuzz-smoke (libfuzzer)
+  fuzz-cto-dispatcher:
+    name: fuzz-smoke (libfuzzer / cto)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Install clang + libFuzzer
-        run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
-      - name: Build with libFuzzer
+      - name: Install clang
+        run: sudo apt-get update && sudo apt-get install -y clang
+      - name: Check for C fuzz harnesses
+        id: check-c-harnesses
         run: |
-          if [ -d slave/fuzz ] && [ -n "$(ls slave/fuzz/*.c 2>/dev/null)" ]; then
-            cd slave
-            cmake --preset=fuzz -DCMAKE_C_COMPILER=clang -DCMAKE_C_FLAGS="-fsanitize=fuzzer,address,undefined -O1"
-            cmake --build --preset=fuzz
+          if compgen -G "slave/fuzz/fuzz_*.c" > /dev/null; then
+            echo "have_c=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No fuzz harnesses yet (slave/fuzz/ empty). PR-2 onwards seeds harnesses + corpus."
-            exit 0
+            echo "have_c=false" >> "$GITHUB_OUTPUT"
+            echo "No C fuzz harnesses yet (slave/fuzz/fuzz_*.c absent)."
           fi
-      - name: Run fuzz (time-budgeted)
+      - name: Build C harnesses with libFuzzer + ASan + UBSan
+        if: steps.check-c-harnesses.outputs.have_c == 'true'
         run: |
-          if [ -d slave/build/fuzz ] && [ -n "$(ls slave/build/fuzz/fuzz_* 2>/dev/null)" ]; then
-            for harness in slave/build/fuzz/fuzz_*; do
-              echo "=== $harness ==="
-              "$harness" slave/fuzz/corpus/ -max_total_time=600 -print_pcs=1 || true
-            done
-          fi
+          mkdir -p slave/fuzz/build
+          for harness_src in slave/fuzz/fuzz_*.c; do
+            harness_name=$(basename "$harness_src" .c)
+            echo "=== building $harness_name ==="
+            clang -fsanitize=fuzzer,address,undefined -O1 -g \
+              -I slave/include -I slave/tests/test/support \
+              "$harness_src" \
+              slave/src/core/xcp_dispatcher.c \
+              -o "slave/fuzz/build/$harness_name"
+          done
+      - name: Run C harnesses (10 min budget each)
+        if: steps.check-c-harnesses.outputs.have_c == 'true'
+        run: |
+          mkdir -p slave/fuzz/crashes
+          for harness in slave/fuzz/build/fuzz_*; do
+            harness_name=$(basename "$harness")
+            corpus_dir="slave/fuzz/corpus/${harness_name#fuzz_}"
+            corpus_dir="${corpus_dir%_dispatcher}"
+            corpus_dir="${corpus_dir%_parser}"
+            if [ ! -d "$corpus_dir" ]; then
+              corpus_dir="slave/fuzz/corpus/cto"  # fallback
+            fi
+            echo "=== running $harness_name against $corpus_dir ==="
+            "$harness" "$corpus_dir/" \
+              -max_total_time=600 \
+              -print_pcs=1 \
+              -artifact_prefix=slave/fuzz/crashes/ \
+              || true
+          done
       - name: Upload crash artefacts
         if: always()
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
         with:
-          name: fuzz-crashes-${{ github.run_id }}
+          name: fuzz-crashes-cto-${{ github.run_id }}
           path: slave/fuzz/crashes/
           retention-days: 90
           if-no-files-found: ignore
+
+  fuzz-a2l-parser:
+    name: fuzz-smoke (atheris / a2l)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
+      - name: Check for Python fuzz harness
+        id: check-py-harness
+        run: |
+          if [ -f slave/fuzz/fuzz_a2l_parser.py ]; then
+            echo "have_py=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have_py=false" >> "$GITHUB_OUTPUT"
+            echo "No Python fuzz harness yet (slave/fuzz/fuzz_a2l_parser.py absent)."
+          fi
+      - name: Install atheris + tethys-master
+        if: steps.check-py-harness.outputs.have_py == 'true'
+        working-directory: master
+        run: |
+          uv sync --no-progress || echo "uv sync failed; harness will skip cleanly"
+          uv pip install atheris || echo "atheris install failed; harness will skip cleanly"
+      - name: Run Python harness (5 min budget)
+        if: steps.check-py-harness.outputs.have_py == 'true'
+        working-directory: master
+        run: |
+          # The harness itself prints a "skipping (no fuzz performed)" notice
+          # and exits 0 when atheris is unavailable, so this step is safe
+          # on environments where atheris cannot install.
+          uv run python ../slave/fuzz/fuzz_a2l_parser.py \
+            ../slave/fuzz/corpus/a2l/ \
+            -atheris_runs=20000 \
+            -artifact_prefix=../slave/fuzz/crashes/ \
+            || true
+      - name: Upload crash artefacts
+        if: always()
+        uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
+        with:
+          name: fuzz-crashes-a2l-${{ github.run_id }}
+          path: slave/fuzz/crashes/
+          retention-days: 90
+          if-no-files-found: ignore
+
+  # fuzz-nightly is not a required PR check (cron + workflow_dispatch only;
+  # no pull_request trigger), so we do not need an aggregator job. The two
+  # jobs above are independent: cto fuzzing can pass even when atheris is
+  # unavailable, and vice-versa. Crash artefacts are kept per-job to make
+  # triage easier.

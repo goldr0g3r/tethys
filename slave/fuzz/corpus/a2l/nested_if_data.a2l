@@ -1,0 +1,11 @@
+/begin PROJECT p "nested if_data"
+  /begin MODULE m "n"
+    /begin IF_DATA XCP
+      /begin IF_DATA CAN
+        /begin IF_DATA TP_BLOB
+          BIT_RATE 500000
+        /end IF_DATA
+      /end IF_DATA
+    /end IF_DATA
+  /end MODULE
+/end PROJECT

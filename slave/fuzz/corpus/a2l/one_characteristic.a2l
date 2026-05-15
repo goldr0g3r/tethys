@@ -1,0 +1,15 @@
+/begin PROJECT p "one characteristic"
+  /begin MODULE m "one characteristic"
+    /begin CHARACTERISTIC
+      c
+      "c"
+      VALUE
+      0x1000
+      RL
+      0.0
+      conv
+      0.0
+      100.0
+    /end CHARACTERISTIC
+  /end MODULE
+/end PROJECT
