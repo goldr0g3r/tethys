@@ -10,6 +10,8 @@
  */
 #include "tethys/xcp_dispatcher.h"
 
+#include "tethys/xcp_daq.h"
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -116,6 +118,14 @@ static uint32_t decode_u32_le(uint8_t const* p)
          | ((uint32_t)p[1] << 8U)
          | ((uint32_t)p[2] << 16U)
          | ((uint32_t)p[3] << 24U);
+}
+
+/**
+ * @brief Decode a little-endian u16 from 2 wire bytes.
+ */
+static uint16_t decode_u16_le(uint8_t const* p)
+{
+    return (uint16_t)((uint16_t)p[0] | ((uint16_t)p[1] << 8U));
 }
 
 /**
@@ -428,6 +438,352 @@ static size_t handle_synch(uint8_t* response, size_t resp_cap)
     return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNCH);
 }
 
+/* ---- Phase 3 DAQ handlers -------------------------------------------- */
+
+static size_t write_res_only(uint8_t* response, size_t resp_cap)
+{
+    if (resp_cap < (size_t)1U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    return (size_t)1U;
+}
+
+static bool daq_ready(tethys_xcp_state_t const* state)
+{
+    return (state->connected) && (state->daq != NULL);
+}
+
+static size_t handle_free_daq(
+    tethys_xcp_state_t* state, uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    (void)tethys_daq_free(state->daq);
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_alloc_daq(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)4U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (tethys_daq_alloc(state->daq, decode_u16_le(&request[2])) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_MEMORY_OVERFLOW);
+    }
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_alloc_odt(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)5U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (tethys_daq_alloc_odt(state->daq, decode_u16_le(&request[2]), request[4]) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_MEMORY_OVERFLOW);
+    }
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_alloc_odt_entry(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)6U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (tethys_daq_alloc_odt_entry(
+            state->daq, decode_u16_le(&request[2]), request[4], request[5]) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_MEMORY_OVERFLOW);
+    }
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_set_daq_ptr(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)6U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (tethys_daq_set_ptr(
+            state->daq, decode_u16_le(&request[2]), request[4], request[5]) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_write_daq(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)8U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (tethys_daq_write_entry(
+            state->daq, request[1], request[2], request[3],
+            decode_u32_le(&request[4])) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_DAQ_CONFIG);
+    }
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_write_daq_multiple(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)2U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    uint8_t const n = request[1];
+    if (n == (uint8_t)0U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    size_t const required = (size_t)2U + (size_t)n * (size_t)8U;
+    if (req_len < required) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    for (uint8_t i = (uint8_t)0U; i < n; ++i) {
+        size_t const base = (size_t)2U + (size_t)i * (size_t)8U;
+        if (tethys_daq_write_entry(
+                state->daq, request[base + 0U], request[base + 1U],
+                request[base + 2U], decode_u32_le(&request[base + 4U])) != 0) {
+            return write_error_response(response, resp_cap, TETHYS_XCP_ERR_DAQ_CONFIG);
+        }
+    }
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_set_daq_list_mode(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)8U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (tethys_daq_set_list_mode(
+            state->daq, decode_u16_le(&request[2]), request[1],
+            decode_u16_le(&request[4]), request[6], request[7]) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_get_daq_list_mode(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)4U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    uint8_t  mode      = (uint8_t)0U;
+    uint16_t event_ch  = (uint16_t)0U;
+    uint8_t  prescaler = (uint8_t)0U;
+    uint8_t  priority  = (uint8_t)0U;
+    if (tethys_daq_get_list_mode(
+            state->daq, decode_u16_le(&request[2]), &mode, &event_ch,
+            &prescaler, &priority) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    if (resp_cap < (size_t)8U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    response[1] = mode;
+    response[2] = (uint8_t)0U;
+    response[3] = (uint8_t)0U;
+    response[4] = (uint8_t)( event_ch        & 0xFFU);
+    response[5] = (uint8_t)((event_ch >> 8U) & 0xFFU);
+    response[6] = prescaler;
+    response[7] = priority;
+    return (size_t)8U;
+}
+
+static size_t handle_start_stop_daq_list(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)4U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    uint8_t first_pid = (uint8_t)0U;
+    if (tethys_daq_start_stop_list(
+            state->daq, decode_u16_le(&request[2]), request[1], &first_pid) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    if (resp_cap < (size_t)2U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    response[1] = first_pid;
+    return (size_t)2U;
+}
+
+static size_t handle_start_stop_synch(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)2U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (tethys_daq_start_stop_synch(state->daq, request[1]) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    return write_res_only(response, resp_cap);
+}
+
+static size_t handle_get_daq_processor_info(
+    tethys_xcp_state_t* state, uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (resp_cap < (size_t)8U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    response[1] = (uint8_t)0x41U;
+    response[2] = (uint8_t)TETHYS_DAQ_MAX_LISTS;
+    response[3] = (uint8_t)0U;
+    response[4] = (uint8_t)0xFFU;
+    response[5] = (uint8_t)0xFFU;
+    response[6] = (uint8_t)0U;
+    response[7] = (uint8_t)0U;
+    return (size_t)8U;
+}
+
+static size_t handle_get_daq_resolution_info(
+    tethys_xcp_state_t* state, uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (resp_cap < (size_t)8U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    response[1] = (uint8_t)1U;
+    response[2] = (uint8_t)0xFFU;
+    response[3] = (uint8_t)1U;
+    response[4] = (uint8_t)0xFFU;
+    response[5] = (uint8_t)0x34U;
+    response[6] = (uint8_t)1U;
+    response[7] = (uint8_t)0U;
+    return (size_t)8U;
+}
+
+static size_t handle_get_daq_list_info(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)4U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    tethys_daq_list_t const* const list =
+        tethys_daq_get_list(state->daq, decode_u16_le(&request[2]));
+    if (list == NULL) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    if (resp_cap < (size_t)6U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    response[1] = (uint8_t)0x10U;
+    if ((list->mode & TETHYS_DAQ_MODE_DIRECTION_STIM) != (uint8_t)0U) {
+        response[1] |= (uint8_t)0x04U;
+    }
+    response[2] = list->odt_count;
+    response[3] = (uint8_t)TETHYS_DAQ_MAX_ENTRIES_PER_ODT;
+    response[4] = (uint8_t)( list->event_channel        & 0xFFU);
+    response[5] = (uint8_t)((list->event_channel >> 8U) & 0xFFU);
+    return (size_t)6U;
+}
+
+static size_t handle_get_daq_event_info(
+    tethys_xcp_state_t* state, uint8_t const* request, size_t req_len,
+    uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (req_len < (size_t)4U) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_SYNTAX);
+    }
+    if (resp_cap < (size_t)7U) {
+        return (size_t)0U;
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    response[1] = (uint8_t)0x05U;
+    response[2] = (uint8_t)TETHYS_DAQ_MAX_LISTS;
+    response[3] = (uint8_t)11U;
+    response[4] = (uint8_t)1U;
+    response[5] = (uint8_t)6U;
+    response[6] = (uint8_t)0U;
+    return (size_t)7U;
+}
+
+static size_t handle_read_daq(
+    tethys_xcp_state_t* state, uint8_t* response, size_t resp_cap)
+{
+    if (!daq_ready(state)) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);
+    }
+    if (resp_cap < (size_t)8U) {
+        return (size_t)0U;
+    }
+    tethys_daq_entry_t e = {0};
+    if (tethys_daq_read_entry(state->daq, &e) != 0) {
+        return write_error_response(response, resp_cap, TETHYS_XCP_ERR_OUT_OF_RANGE);
+    }
+    response[0] = TETHYS_XCP_PID_RES;
+    response[1] = e.bit_offset;
+    response[2] = e.size_bytes;
+    response[3] = e.addr_extension;
+    response[4] = (uint8_t)( e.address        & 0xFFU);
+    response[5] = (uint8_t)((e.address >>  8) & 0xFFU);
+    response[6] = (uint8_t)((e.address >> 16) & 0xFFU);
+    response[7] = (uint8_t)((e.address >> 24) & 0xFFU);
+    return (size_t)8U;
+}
+
 /* ---- Public API ------------------------------------------------------- */
 
 void tethys_xcp_init(tethys_xcp_state_t* state)
@@ -444,6 +800,7 @@ void tethys_xcp_init(tethys_xcp_state_t* state)
     state->mta_extension = (uint8_t)0U;
     state->memory        = NULL;
     state->memory_size   = (size_t)0U;
+    state->daq           = NULL;
 }
 
 void tethys_xcp_attach_memory(tethys_xcp_state_t* state, uint8_t* mem, size_t size)
@@ -453,6 +810,20 @@ void tethys_xcp_attach_memory(tethys_xcp_state_t* state, uint8_t* mem, size_t si
     }
     state->memory      = mem;
     state->memory_size = (mem == NULL) ? (size_t)0U : size;
+    if (state->daq != NULL) {
+        tethys_daq_attach_memory(state->daq, mem, state->memory_size);
+    }
+}
+
+void tethys_xcp_attach_daq(tethys_xcp_state_t* state, tethys_daq_engine_t* engine)
+{
+    if (state == NULL) {
+        return;
+    }
+    state->daq = engine;
+    if (engine != NULL) {
+        tethys_daq_attach_memory(engine, state->memory, state->memory_size);
+    }
 }
 
 int tethys_xcp_dispatch(
@@ -520,6 +891,54 @@ int tethys_xcp_dispatch(
     }
     else if (cmd == TETHYS_XCP_CMD_SYNCH) {
         written = handle_synch(response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_FREE_DAQ) {
+        written = handle_free_daq(state, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_ALLOC_DAQ) {
+        written = handle_alloc_daq(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_ALLOC_ODT) {
+        written = handle_alloc_odt(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_ALLOC_ODT_ENTRY) {
+        written = handle_alloc_odt_entry(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_SET_DAQ_PTR) {
+        written = handle_set_daq_ptr(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_WRITE_DAQ) {
+        written = handle_write_daq(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_WRITE_DAQ_MULTIPLE) {
+        written = handle_write_daq_multiple(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_SET_DAQ_LIST_MODE) {
+        written = handle_set_daq_list_mode(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_GET_DAQ_LIST_MODE) {
+        written = handle_get_daq_list_mode(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_START_STOP_DAQ_LIST) {
+        written = handle_start_stop_daq_list(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_START_STOP_SYNCH) {
+        written = handle_start_stop_synch(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_GET_DAQ_PROCESSOR_INFO) {
+        written = handle_get_daq_processor_info(state, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_GET_DAQ_RESOLUTION_INFO) {
+        written = handle_get_daq_resolution_info(state, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_GET_DAQ_LIST_INFO) {
+        written = handle_get_daq_list_info(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_GET_DAQ_EVENT_INFO) {
+        written = handle_get_daq_event_info(state, request, req_len, response, resp_cap);
+    }
+    else if (cmd == TETHYS_XCP_CMD_READ_DAQ) {
+        written = handle_read_daq(state, response, resp_cap);
     }
     else {
         written = write_error_response(response, resp_cap, TETHYS_XCP_ERR_CMD_UNKNOWN);

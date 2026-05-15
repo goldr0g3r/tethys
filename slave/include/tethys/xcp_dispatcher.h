@@ -35,6 +35,7 @@
 #pragma once
 
 #include "tethys/tethys_export.h"
+#include "tethys/xcp_daq.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -86,6 +87,10 @@ extern "C" {
 #define TETHYS_XCP_ERR_CMD_SYNTAX     ((uint8_t)0x21U)
 #define TETHYS_XCP_ERR_OUT_OF_RANGE   ((uint8_t)0x22U)
 #define TETHYS_XCP_ERR_ACCESS_DENIED  ((uint8_t)0x24U)
+#define TETHYS_XCP_ERR_PAGE_NOT_VALID ((uint8_t)0x26U)
+/* TETHYS_XCP_ERR_MEMORY_OVERFLOW (0x30) + TETHYS_XCP_ERR_DAQ_CONFIG (0x32)
+ * live in tethys/xcp_daq.h so the DAQ engine can use them without
+ * pulling the whole dispatcher header. */
 
 /** CONNECT response resource availability bits (XCP 1.4 Part 2 §1.3.2.4). */
 #define TETHYS_XCP_RES_CAL_PAG   ((uint8_t)0x01U)
@@ -124,6 +129,14 @@ typedef struct
     uint8_t  mta_extension;
     uint8_t* memory;
     size_t   memory_size;
+
+    /* Phase 3: optional DAQ engine. NULL = DAQ commands return
+     * ERR_CMD_UNKNOWN (the slave does not advertise DAQ in the
+     * CONNECT response). When attached, the dispatcher routes DAQ
+     * commands through the engine and shares the same memory backend.
+     * Caller owns the engine storage (typically a sibling static in
+     * the host application). */
+    tethys_daq_engine_t* daq;
 } tethys_xcp_state_t;
 
 /* ---- Public API ------------------------------------------------------- */
@@ -158,6 +171,25 @@ TETHYS_EXPORT void tethys_xcp_attach_memory(
     tethys_xcp_state_t* state,
     uint8_t*            mem,
     size_t              size);
+
+/**
+ * @brief Attach a caller-owned DAQ engine instance.
+ *
+ * Pass NULL to detach (DAQ commands then return ERR_CMD_UNKNOWN). When
+ * attached the dispatcher forwards DAQ command codes (XCP 1.4 §1.4) to
+ * the engine and binds the engine's memory backend to the same buffer
+ * used by UPLOAD/DOWNLOAD.
+ *
+ * Tethys's API splits DAQ off into its own translation unit (xcp_daq.c)
+ * so the dispatcher stays small and the DAQ engine is testable in
+ * isolation. The xcp dispatcher only ever sees the engine through this
+ * pointer.
+ *
+ * @pre state != NULL
+ */
+TETHYS_EXPORT void tethys_xcp_attach_daq(
+    tethys_xcp_state_t*  state,
+    tethys_daq_engine_t* engine);
 
 /**
  * @brief Dispatch one inbound CTO request and write the response.
