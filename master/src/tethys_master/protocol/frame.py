@@ -1,11 +1,10 @@
 """XCP CTO frame encoding / decoding.
 
 This module implements the XCP 1.4 Part 2 Standard Command set Tethys
-supports today (parent plan §8 Phase 1 + Phase 2 read path):
-CONNECT, DISCONNECT, GET_STATUS, GET_VERSION, SET_MTA, UPLOAD,
-SHORT_UPLOAD, plus the corresponding response frame parsing.
-
-Phase 2 PR-29 extends this to DOWNLOAD, BUILD_CHECKSUM, SYNCH.
+supports today (parent plan §8 Phase 1 + Phase 2):
+CONNECT, DISCONNECT, GET_STATUS, SYNCH, GET_VERSION, SET_MTA, UPLOAD,
+SHORT_UPLOAD, DOWNLOAD, BUILD_CHECKSUM, plus the corresponding response
+frame parsing.
 
 Cite: ASAM XCP 1.4 Part 2 §1.3.2.4 CONNECT
 Cite: ASAM XCP 1.4 Part 2 §1.3.2.5 DISCONNECT
@@ -14,7 +13,10 @@ Cite: ASAM XCP 1.4 Part 2 §1.4.2.1 GET_VERSION
 Cite: ASAM XCP 1.4 Part 2 §1.3.3.1 SET_MTA
 Cite: ASAM XCP 1.4 Part 2 §1.3.3.2 UPLOAD
 Cite: ASAM XCP 1.4 Part 2 §1.3.3.6 SHORT_UPLOAD
-Trace: docs/traceability.csv row TETHYS-DES-0001..0007 (lands at PR-10)
+Cite: ASAM XCP 1.4 Part 2 §1.3.4.1 DOWNLOAD
+Cite: ASAM XCP 1.4 Part 2 §1.5.1 BUILD_CHECKSUM
+Cite: ASAM XCP 1.4 Part 2 §1.3.1.2 SYNCH
+Trace: docs/traceability.csv row TETHYS-DES-0001..0010 (lands at PR-10)
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ from typing import ClassVar
 
 
 class XcpCommand(IntEnum):
-    """XCP Standard Command codes (Phase 1 + Phase 2 read path).
+    """XCP Standard Command codes (Phase 1 + Phase 2).
 
     Reference: ASAM XCP 1.4 Part 2 Table 5 (Standard Command codes).
     """
@@ -39,6 +41,23 @@ class XcpCommand(IntEnum):
     SET_MTA = 0xF6
     UPLOAD = 0xF5
     SHORT_UPLOAD = 0xF4
+    BUILD_CHECKSUM = 0xF3
+    DOWNLOAD = 0xF0
+
+
+class XcpChecksumType(IntEnum):
+    """BUILD_CHECKSUM algorithm codes (XCP 1.4 Part 2 §1.5 Table 11; subset)."""
+
+    ADD_11 = 0x01
+    ADD_12 = 0x02
+    ADD_14 = 0x03
+    ADD_22 = 0x04
+    ADD_24 = 0x05
+    ADD_44 = 0x06
+    CRC_16 = 0x07
+    CRC_16_CITT = 0x08
+    CRC_32 = 0x09
+    USER_DEFINED = 0xFF
 
 
 class XcpPacketId(IntEnum):
@@ -71,6 +90,14 @@ XCP_MAX_UPLOAD_BYTES = 7
 
 XCP CTO is 8 bytes by default; one byte is the response PID, leaving 7 bytes
 of payload. Multi-CTO block-transfer reads are deferred to a later phase.
+"""
+
+XCP_MAX_DOWNLOAD_BYTES = 6
+"""Maximum number of payload bytes per single-frame DOWNLOAD request.
+
+XCP CTO is 8 bytes by default; the DOWNLOAD command consumes 2 bytes
+(PID + N), leaving 6 bytes of payload. Block-transfer mode reuses the
+DAQ ODT machinery and lands in Phase 3.
 """
 
 
@@ -409,3 +436,87 @@ class UploadResponse:
 
     def encode_body(self) -> bytes:
         return bytes(self.data)
+
+
+# ---- Phase 2 write / checksum / sync commands -------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadRequest:
+    """XCP DOWNLOAD request (XCP 1.4 Part 2 §1.3.4.1).
+
+    Wire layout:
+        [0]      PID = 0xF0
+        [1]      N - number of bytes (1..MAX_CTO-2 = 1..6)
+        [2..1+N] data bytes to write at MTA
+    """
+
+    data: bytes
+
+    _CMD: ClassVar[int] = XcpCommand.DOWNLOAD
+
+    def encode(self) -> bytes:
+        n = len(self.data)
+        if not (1 <= n <= XCP_MAX_DOWNLOAD_BYTES):
+            msg = f"DOWNLOAD payload length out of range [1, {XCP_MAX_DOWNLOAD_BYTES}]: {n}"
+            raise ValueError(msg)
+        return bytes([self._CMD, n]) + bytes(self.data)
+
+
+@dataclass(frozen=True, slots=True)
+class BuildChecksumRequest:
+    """XCP BUILD_CHECKSUM request (XCP 1.4 Part 2 §1.5.1).
+
+    Wire layout (8 bytes):
+        [0]    PID = 0xF3
+        [1..3] reserved (zero)
+        [4..7] block_size (4 bytes, little-endian)
+    """
+
+    block_size: int
+
+    _CMD: ClassVar[int] = XcpCommand.BUILD_CHECKSUM
+
+    def encode(self) -> bytes:
+        if not (1 <= self.block_size <= 0xFFFFFFFF):
+            msg = f"block_size out of u32 range: {self.block_size}"
+            raise ValueError(msg)
+        return struct.pack("<BBBBI", self._CMD, 0, 0, 0, self.block_size)
+
+
+@dataclass(frozen=True, slots=True)
+class BuildChecksumResponse:
+    """BUILD_CHECKSUM positive response (XCP 1.4 Part 2 §1.5.1)."""
+
+    checksum_type: int
+    checksum: int
+
+    @classmethod
+    def decode(cls, payload: bytes) -> BuildChecksumResponse:
+        if len(payload) < 7:
+            msg = f"BUILD_CHECKSUM response body too short: {len(payload)}"
+            raise ValueError(msg)
+        checksum = int.from_bytes(payload[3:7], byteorder="little", signed=False)
+        return cls(checksum_type=payload[0], checksum=checksum)
+
+    def encode_body(self) -> bytes:
+        return bytes([self.checksum_type & 0xFF, 0, 0]) + (self.checksum & 0xFFFFFFFF).to_bytes(
+            4, byteorder="little", signed=False
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class SynchRequest:
+    """XCP SYNCH request (XCP 1.4 Part 2 §1.3.1.2).
+
+    Wire layout: 1 byte PID = 0xFC.
+
+    Per spec the slave always answers with ERR_CMD_SYNCH (0x00) to mark the
+    end of any pending command sequence; the master treats this as the
+    expected synchronisation acknowledgement, not as a fatal error.
+    """
+
+    _CMD: ClassVar[int] = XcpCommand.SYNCH
+
+    def encode(self) -> bytes:
+        return bytes([self._CMD])
