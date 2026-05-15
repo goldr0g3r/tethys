@@ -11,8 +11,13 @@ name: misra-gate
 
 on:
   pull_request:
-    paths:
-      - 'slave/**'
+  push:
+    branches: [main]
+
+# Note: runs on EVERY PR (not just slave/** touches) so the misra-gate context
+# is always reported and branch protection's required-status-check contract is
+# satisfied. When slave/src/ + slave/include/ are empty, cppcheck reports
+# "nothing to check" and the job exits 0.
 
 permissions:
   contents: read
@@ -28,6 +33,10 @@ jobs:
 
       - name: cppcheck MISRA on slave/src
         run: |
+          # When slave/src has no .c files yet (Phase-0), cppcheck reports
+          # "no C source files in path" and exits 1; pipe to tee then check
+          # the log so we don't fail-fast on an empty tree.
+          set +e
           cppcheck \
             --addon=misra \
             --enable=warning,style,performance,portability \
@@ -37,6 +46,13 @@ jobs:
             --std=c11 \
             slave/src slave/include \
             2>&1 | tee cppcheck-misra.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          # Empty-tree exit code 1 from cppcheck = "no source files"; only
+          # treat as a failure if we actually found violations.
+          if [ "$rc" -ne 0 ] && ! grep -q "no C or C++ source files found" cppcheck-misra.log; then
+            exit "$rc"
+          fi
 
       - name: Verify zero MISRA mandatory/required deviations
         run: |
