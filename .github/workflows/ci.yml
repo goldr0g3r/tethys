@@ -38,13 +38,22 @@ jobs:
       - name: uv sync
         run: uv sync --no-progress
       - name: ruff
-        run: 'uv run ruff check . || echo "ruff scaffolded - no rules configured yet (Phase-1)"'
+        shell: bash
+        run: |
+          uv run --with ruff ruff check . \
+            || echo "ruff scaffolded - no rules configured yet (Phase-1)"
         continue-on-error: true
       - name: mypy
-        run: 'uv run mypy . || echo "mypy scaffolded - no rules configured yet (Phase-1)"'
+        shell: bash
+        run: |
+          uv run --with mypy mypy . \
+            || echo "mypy scaffolded - no rules configured yet (Phase-1)"
         continue-on-error: true
       - name: pytest
-        run: 'uv run pytest --tb=short || echo "pytest scaffolded - no tests yet (Phase-1)"'
+        shell: bash
+        run: |
+          uv run --with pytest pytest --tb=short \
+            || echo "pytest scaffolded - no tests yet (Phase-1)"
 
   simulator:
     name: simulator
@@ -56,8 +65,11 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
       - run: uv sync --no-progress
-      - run: 'uv run ruff check . || true'
-      - run: 'uv run pytest --tb=short || echo "pytest scaffolded - no tests yet"'
+      - run: |
+          uv run --with ruff ruff check . || true
+      - run: |
+          uv run --with pytest pytest --tb=short \
+            || echo "pytest scaffolded - no tests yet"
 
   slave-posix:
     name: slave / posix

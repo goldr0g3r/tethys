@@ -58,9 +58,13 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
       - run: uv sync --no-progress
-      - run: 'uv run coverage run -m pytest || echo "coverage.py scaffolded - no tests yet"'
-      - run: 'uv run coverage report --show-missing || echo "coverage.py scaffolded - no data yet"'
-      - run: uv run coverage xml || true
+      - run: |
+          uv run --with coverage --with pytest coverage run -m pytest \
+            || echo "coverage.py scaffolded - no tests yet"
+      - run: |
+          uv run --with coverage coverage report --show-missing \
+            || echo "coverage.py scaffolded - no data yet"
+      - run: uv run --with coverage coverage xml || true
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@b4b15b8c7c6ac21ea08fcf65892d2ee8f75cf882 # v4.4.3
