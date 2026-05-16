@@ -1,0 +1,68 @@
+# Tethys master + simulator acceptance bench - parent plan section 8 (Phase 1
+# acceptance) + section 6.7 (ci.yml integration test).
+#
+# Build + run:
+#   cd infrastructure/docker
+#   docker compose up --build --abort-on-container-exit --exit-code-from master
+#
+# Expected: simulator boots; master issues CONNECT/DISCONNECT against it over
+# UDP loopback; master exits 0; compose tears down both containers.
+#
+# Cite: parent plan section 8 (Phase 1 acceptance: CONNECT / DISCONNECT over
+# UDP loopback, single command line both ends).
+# Cite: ADR-0004 transport abstraction layer; ADR-0008 license-free toolchain.
+
+services:
+  simulator:
+    image: tethys-sim:dev
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.simulator
+    command:
+      - serve
+      - --transport
+      - udp
+      - --host
+      - 0.0.0.0
+      - --port
+      - "5555"
+      - --log-level
+      - INFO
+    expose:
+      - "5555/udp"
+    networks:
+      - tethys-bench
+    healthcheck:
+      test: ["CMD-SHELL", "tethys-sim --help >/dev/null"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+      start_period: 2s
+
+  master:
+    image: tethys-master:dev
+    build:
+      context: ../..
+      dockerfile: infrastructure/docker/Dockerfile.master
+    depends_on:
+      simulator:
+        condition: service_healthy
+    command:
+      - connect
+      - --target
+      - udp://simulator:5555
+      - --connect-timeout-ms
+      - "2000"
+    networks:
+      - tethys-bench
+    environment:
+      TETHYS_MASTER_LOG_LEVEL: INFO
+      TETHYS_MASTER_LOG_FORMAT: plain
+
+networks:
+  tethys-bench:
+    # Isolated bridge network; both services talk over `simulator:5555/udp`
+    # using docker-internal DNS. No host port mapping - keeps the bench
+    # off the host's UDP namespace so two compose invocations do not
+    # collide.
+    driver: bridge

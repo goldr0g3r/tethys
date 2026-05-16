@@ -1,0 +1,60 @@
+# syntax=docker/dockerfile:1.7
+# Tethys simulator (tethys-sim) - host-side XCP slave for acceptance bench.
+#
+# Build from repo root:
+#   docker build -t tethys-sim:dev -f infrastructure/docker/Dockerfile.simulator .
+#
+# Run:
+#   docker run --rm -p 5555:5555/udp tethys-sim:dev tethys-sim serve --port 5555
+#
+# Companion to Dockerfile.master; compose.yml stitches the two over an
+# internal UDP network for the master + simulator acceptance bench.
+#
+# Cite: parent plan section 8 (Phase 1 acceptance bench) + section 11.
+# Cite: ADR-0008 (license-free toolchain).
+
+ARG PYTHON_VERSION=3.12.7
+FROM python:${PYTHON_VERSION}-slim-bookworm AS base
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/tethys-venv
+
+ARG UV_VERSION=0.5.4
+RUN pip install --no-cache-dir "uv==${UV_VERSION}"
+
+WORKDIR /workspace
+
+# Simulator depends on `tethys-master` as a path source (see
+# simulator/pyproject.toml [tool.uv.sources]); both packages have to be
+# present at sync time, but the runtime image only invokes `tethys-sim`.
+COPY master/pyproject.toml master/uv.lock master/README.md ./master/
+COPY master/src/ ./master/src/
+COPY simulator/pyproject.toml simulator/uv.lock simulator/README.md ./simulator/
+COPY simulator/src/ ./simulator/src/
+
+RUN cd simulator && uv sync --frozen --no-dev --no-progress
+
+RUN useradd --create-home --shell /usr/sbin/nologin tethys
+USER tethys
+
+WORKDIR /home/tethys
+
+ENV PATH="/opt/tethys-venv/bin:${PATH}"
+
+EXPOSE 5555/udp
+
+HEALTHCHECK --interval=10s --timeout=2s --start-period=2s --retries=3 \
+    CMD ["sh", "-c", "tethys-sim --help >/dev/null"]
+
+ENTRYPOINT ["tethys-sim"]
+CMD ["serve", "--transport", "udp", "--host", "0.0.0.0", "--port", "5555"]
+
+LABEL org.opencontainers.image.title="tethys-sim" \
+      org.opencontainers.image.description="Tethys host-side XCP slave simulator - drives the acceptance bench." \
+      org.opencontainers.image.source="https://github.com/goldr0g3r/tethys" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.documentation="https://github.com/goldr0g3r/tethys/blob/main/simulator/README.md"

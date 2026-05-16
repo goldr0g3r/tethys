@@ -14,6 +14,30 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from tethys_master.logging_setup import get_logger
+from tethys_master.protocol.daq import (
+    AllocDaqRequest,
+    AllocOdtEntryRequest,
+    AllocOdtRequest,
+    DaqList,
+    DaqListMode,
+    FreeDaqRequest,
+    GetDaqListModeRequest,
+    GetDaqListModeResponse,
+    GetDaqProcessorInfoRequest,
+    GetDaqProcessorInfoResponse,
+    GetDaqResolutionInfoRequest,
+    GetDaqResolutionInfoResponse,
+    Odt,
+    OdtEntry,
+    SetDaqListModeRequest,
+    SetDaqPtrRequest,
+    StartStopDaqListRequest,
+    StartStopDaqListResponse,
+    StartStopListMode,
+    StartStopSynchMode,
+    StartStopSynchRequest,
+    WriteDaqRequest,
+)
 from tethys_master.protocol.frame import (
     BuildChecksumRequest,
     BuildChecksumResponse,
@@ -232,3 +256,189 @@ class XcpClient:
             err = ErrorResponse.decode(body)
             raise XcpProtocolError(err.error_code, err.info)
         raise XcpProtocolError(packet_id, body)
+
+    # ---- Phase 3 DAQ command surface ---------------------------------
+
+    async def free_daq(self) -> None:
+        """FREE_DAQ - drop the slave's entire DAQ configuration.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.4.2.7
+        """
+        logger.info("xcp.free_daq")
+        self._ensure_positive(await self._request(FreeDaqRequest().encode()))
+
+    async def alloc_daq(self, list_count: int) -> None:
+        """ALLOC_DAQ - allocate ``list_count`` empty DAQ lists.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.4.2.7
+        """
+        logger.info("xcp.alloc_daq.start", count=list_count)
+        self._ensure_positive(
+            await self._request(AllocDaqRequest(list_count=list_count).encode())
+        )
+
+    async def alloc_odt(self, daq_list_num: int, odt_count: int) -> None:
+        """ALLOC_ODT - allocate ``odt_count`` ODTs inside an already-allocated list."""
+        self._ensure_positive(
+            await self._request(
+                AllocOdtRequest(
+                    daq_list_num=daq_list_num, odt_count=odt_count
+                ).encode()
+            )
+        )
+
+    async def alloc_odt_entry(
+        self, daq_list_num: int, odt_num: int, entry_count: int
+    ) -> None:
+        """ALLOC_ODT_ENTRY - allocate ``entry_count`` entry slots inside an ODT."""
+        self._ensure_positive(
+            await self._request(
+                AllocOdtEntryRequest(
+                    daq_list_num=daq_list_num,
+                    odt_num=odt_num,
+                    entry_count=entry_count,
+                ).encode()
+            )
+        )
+
+    async def set_daq_ptr(
+        self, daq_list_num: int, odt_num: int, entry_idx: int
+    ) -> None:
+        """SET_DAQ_PTR - position the slave's WRITE_DAQ pointer.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.4.2.2
+        """
+        self._ensure_positive(
+            await self._request(
+                SetDaqPtrRequest(
+                    daq_list_num=daq_list_num,
+                    odt_num=odt_num,
+                    entry_idx=entry_idx,
+                ).encode()
+            )
+        )
+
+    async def write_daq(self, entry: OdtEntry) -> None:
+        """WRITE_DAQ - define one ODT element at the current SET_DAQ_PTR position.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.4.2.2
+        """
+        self._ensure_positive(
+            await self._request(WriteDaqRequest(entry=entry).encode())
+        )
+
+    async def write_odt(
+        self, daq_list_num: int, odt_num: int, entries: list[OdtEntry]
+    ) -> None:
+        """Convenience: SET_DAQ_PTR then WRITE_DAQ for each entry in order.
+
+        The slave auto-advances the pointer after each WRITE_DAQ so we
+        only need one SET_DAQ_PTR call per ODT.
+        """
+        await self.set_daq_ptr(daq_list_num, odt_num, 0)
+        for entry in entries:
+            await self.write_daq(entry)
+
+    async def set_daq_list_mode(
+        self,
+        daq_list_num: int,
+        *,
+        mode: int = 0,
+        event_channel: int = 0,
+        prescaler: int = 1,
+        priority: int = 0,
+    ) -> None:
+        """SET_DAQ_LIST_MODE - configure direction / timestamp / event-channel.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.4.2.6
+        """
+        self._ensure_positive(
+            await self._request(
+                SetDaqListModeRequest(
+                    daq_list_num=daq_list_num,
+                    mode=mode,
+                    event_channel=event_channel,
+                    prescaler=prescaler,
+                    priority=priority,
+                ).encode()
+            )
+        )
+
+    async def get_daq_list_mode(self, daq_list_num: int) -> GetDaqListModeResponse:
+        body = self._ensure_positive(
+            await self._request(
+                GetDaqListModeRequest(daq_list_num=daq_list_num).encode()
+            )
+        )
+        return GetDaqListModeResponse.decode(body)
+
+    async def start_stop_daq_list(
+        self, daq_list_num: int, mode: StartStopListMode | int
+    ) -> StartStopDaqListResponse:
+        """START_STOP_DAQ_LIST - per-list start / stop / select.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.4.2.4
+        """
+        body = self._ensure_positive(
+            await self._request(
+                StartStopDaqListRequest(
+                    daq_list_num=daq_list_num, mode=int(mode)
+                ).encode()
+            )
+        )
+        return StartStopDaqListResponse.decode(body)
+
+    async def start_stop_synch(self, mode: StartStopSynchMode | int) -> None:
+        """START_STOP_SYNCH - all-lists race-fix variant.
+
+        Cite: ASAM XCP 1.4 Part 2 §1.4.2.5
+        """
+        self._ensure_positive(
+            await self._request(StartStopSynchRequest(mode=int(mode)).encode())
+        )
+
+    async def get_daq_processor_info(self) -> GetDaqProcessorInfoResponse:
+        body = self._ensure_positive(
+            await self._request(GetDaqProcessorInfoRequest().encode())
+        )
+        return GetDaqProcessorInfoResponse.decode(body)
+
+    async def get_daq_resolution_info(self) -> GetDaqResolutionInfoResponse:
+        body = self._ensure_positive(
+            await self._request(GetDaqResolutionInfoRequest().encode())
+        )
+        return GetDaqResolutionInfoResponse.decode(body)
+
+    # ---- DAQ-list orchestration helper -------------------------------
+
+    async def configure_daq_list(
+        self,
+        daq_list_num: int,
+        *,
+        odts: list[list[OdtEntry]],
+        mode: int = 0,
+        event_channel: int = 0,
+        prescaler: int = 1,
+        priority: int = 0,
+    ) -> DaqList:
+        """End-to-end ALLOC + WRITE + SET_DAQ_LIST_MODE for one list.
+
+        Assumes ALLOC_DAQ has already been issued. Returns a populated
+        :class:`DaqList` snapshot (with ``first_pid=0`` until the caller
+        calls :meth:`start_stop_daq_list` and stamps the response in).
+        """
+        await self.alloc_odt(daq_list_num, len(odts))
+        daq_list = DaqList(mode=DaqListMode(mode), event_channel=event_channel,
+                           prescaler=prescaler, priority=priority)
+        for odt_num, entries in enumerate(odts):
+            await self.alloc_odt_entry(daq_list_num, odt_num, len(entries))
+            await self.write_odt(daq_list_num, odt_num, entries)
+            daq_list.odts.append(Odt(entries=list(entries)))
+        await self.set_daq_list_mode(
+            daq_list_num,
+            mode=mode,
+            event_channel=event_channel,
+            prescaler=prescaler,
+            priority=priority,
+        )
+        return daq_list

@@ -1,0 +1,7 @@
+# hil/keys/ - AES-128 raw-byte keys for the space-profile seed-and-key
+# handshake (ADR-0006). NEVER commit a key. This .gitignore is a
+# defence-in-depth backstop in addition to secret-scan.yml + Conventional
+# Commits review discipline.
+*
+!README.md
+!.gitignore

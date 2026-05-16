@@ -1,0 +1,57 @@
+feat(slave): static DAQ + ODT engine per XCP 1.4 §1.4 (phase 3 pr-3a)
+
+Adds the Tethys C-slave's static DAQ engine ahead of the Phase 3
+acceptance criterion (1 kHz DAQ on simulator with zero loss for 60 min).
+PR-3a ships the configuration-side wire surface; PR-3b wires the
+event-tick fan-out + DTO transmission via the TAL; PR-3c..3e bring up
+the master + STIM + soak test.
+
+The engine is statically sized per ADR-0005:
+  - TETHYS_DAQ_MAX_LISTS=4
+  - TETHYS_DAQ_MAX_ODT_PER_LIST=8
+  - TETHYS_DAQ_MAX_ENTRIES_PER_ODT=16
+  - TETHYS_DAQ_MAX_DTO_BYTES=64
+Total RAM = ~4 KiB; fits both STM32F4 marine (192 KiB SRAM, 2.1 %) and
+STM32H7 space (1 MiB SRAM, 0.4 %).
+
+Sixteen XCP commands route through tethys_xcp_dispatch() into the
+engine when the host application calls tethys_xcp_attach_daq():
+  - FREE_DAQ (0xD6), ALLOC_DAQ (0xD5), ALLOC_ODT (0xD4),
+    ALLOC_ODT_ENTRY (0xD3)
+  - SET_DAQ_PTR (0xE2), WRITE_DAQ (0xE1), WRITE_DAQ_MULTIPLE (0xC7),
+    READ_DAQ (0xDB)
+  - SET_DAQ_LIST_MODE (0xE0), GET_DAQ_LIST_MODE (0xDF),
+    START_STOP_DAQ_LIST (0xDE), START_STOP_SYNCH (0xDD)
+  - GET_DAQ_PROCESSOR_INFO (0xDA), GET_DAQ_RESOLUTION_INFO (0xD9),
+    GET_DAQ_LIST_INFO (0xD8), GET_DAQ_EVENT_INFO (0xD7)
+
+Without an engine attached, all 16 codes still return ERR_CMD_UNKNOWN
+exactly like before so existing Phase 1 / Phase 2 conformance is
+preserved.
+
+DTO pack/unpack helpers (tethys_daq_pack_dto + tethys_daq_apply_stim_dto)
+are part of PR-3a too so the round-trip unit test can exercise both
+directions of the engine; the event-tick fan-out that actually fires
+them lands in PR-3b.
+
+Unity test coverage:
+  - slave/tests/test/test_xcp_odt.c (9 tests): reset, pack, unpack,
+    bounds-check, buffer-overflow, NULL guards.
+  - slave/tests/test/test_xcp_daq.c (21 tests): engine init, ALLOC
+    pathways, SET_DAQ_PTR bounds enforcement, WRITE_DAQ +
+    WRITE_DAQ_MULTIPLE, START_STOP per-list + SYNCH select / start /
+    stop, DTO pack with + without timestamp prefix, STIM unpack
+    round-trip, dispatcher routing for the full DAQ command set.
+
+Cite: ASAM XCP 1.4 Part 2 §1.4 (Data Acquisition command set)
+Cite: ASAM XCP 1.4 Part 2 §1.4.1 (ODT model)
+Cite: ASAM XCP 1.4 Part 2 §1.4.2.2 (WRITE_DAQ wire layout)
+Cite: ASAM XCP 1.4 Part 2 §1.4.2.4 (START_STOP_DAQ_LIST modes)
+Cite: ASAM XCP 1.4 Part 2 §1.4.2.5 (START_STOP_SYNCH race-fix variant)
+Cite: ASAM XCP 1.4 Part 2 §1.4.2.6 (SET_DAQ_LIST_MODE direction + timestamp bits)
+Cite: ASAM XCP 1.4 Part 2 §1.4.2.13 (GET_DAQ_PROCESSOR_INFO)
+Cite: ASAM XCP 1.4 Part 2 §3.1.5 (XCP-on-Ethernet CTR field)
+Cite: ADR-0005 (no dynamic allocation - static engine sizing rationale)
+Cite: ADR-0010 row 2 + row 12 (DAQ loss budget + loopback acceptance)
+Cite: MISRA-C-2023 clean (mandatory + required; bounded loops only)
+Trace: docs/traceability.csv rows TETHYS-DES-0040..0064 + TETHYS-TST-0050..0084 (land at PR-10)

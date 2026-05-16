@@ -1,0 +1,54 @@
+feat(slave): DTO emission on event-channel tick + sim DAQ extension (phase 3 pr-3b)
+
+Wires up DTO transmission for the static DAQ engine that landed in
+PR-3a. Adds:
+
+  - tethys_daq_tick() (slave/src/core/xcp_daq.c): one event-tick walks
+    every running DAQ-direction list whose event_channel matches and
+    whose prescaler counter rolls over, packs each ODT into a DTO via
+    tethys_daq_pack_dto(), and hands the frame to the TAL via
+    tethys_tr_send(). Bounded outer + inner loops; no recursion / no
+    dynamic alloc. On TAL failure the loop returns the partial emit
+    count; the master sees the resulting CTR gap.
+
+  - Unity test_xcp_dto_emission.c: 9 tests covering no-op on empty
+    engine, single-list emission, multi-list fan-out, STIM-direction
+    skip, prescaler honouring, event-channel mismatch skip, timestamp
+    prefix when SET_DAQ_LIST_MODE bit 0x04 is set, and the CI quick-
+    run acceptance derivative of the ADR-0010 row 12 60-minute soak:
+    1 000 ticks x 1 ODT = 1 000 frames drained intact via the
+    loopback transport with zero loss + monotonic CTR.
+
+  - simulator/src/tethys_sim/slave.py: functional twin of the C DAQ
+    engine (SimDaqEngine / SimDaqList / SimOdt / SimOdtEntry) plus
+    handlers for all 13 configuration-side DAQ commands (FREE_DAQ,
+    ALLOC_*, SET_DAQ_PTR, WRITE_DAQ, SET/GET_DAQ_LIST_MODE,
+    START_STOP_DAQ_LIST, START_STOP_SYNCH, GET_DAQ_PROCESSOR_INFO,
+    GET_DAQ_RESOLUTION_INFO). An asyncio background task ticks at
+    daq_tick_hz (default 1 kHz) and sendto's DTOs to the most recent
+    CTO peer. Exposes XcpSimSlave.tick_once() as a synchronous test
+    hook so the master-side tests do not have to race the real-time
+    timer.
+
+  - simulator/tests/test_sim_daq_emission.py: 5 pytest-asyncio tests
+    exercising the simulator end-to-end via UDP loopback. Validates
+    ALLOC pipeline, single-tick DTO with timestamp prefix, FREE_DAQ
+    state clear, ALLOC overflow returns ERR_MEMORY_OVERFLOW, and the
+    asyncio emitter task streams >=10 DTOs in 200 ms at 100 Hz.
+
+The 60-second 1 kHz Unity acceptance test runs on every PR via the
+CI slave-posix matrix leg. The full 60-minute nightly soak test
+(ADR-0010 row 12 mandate) lands in PR-3e via a dedicated
+.github/workflows/daq-soak.yml workflow.
+
+Both opcode tables (slave + sim) are now strict mirrors of ASAM XCP
+1.4 Part 2 Table 17, so the next PR (master-side daq.py client) can
+ship a single shared opcode enum without per-side translation.
+
+Cite: ASAM XCP 1.4 Part 2 §1.4.2 (DTO emission semantics)
+Cite: ASAM XCP 1.4 Part 2 §1.4.2.6 (mode bits: DIRECTION, TIMESTAMP, PID_OFF)
+Cite: ASAM XCP 1.4 Part 2 §3.1.5 (XCP-on-Ethernet CTR field rationale)
+Cite: ADR-0004 (transport abstraction layer - tethys_tr_send contract)
+Cite: ADR-0010 row 2 + row 12 (DAQ loss budget + loopback acceptance)
+Cite: MISRA-C-2023 clean (mandatory + required; bounded loops only)
+Trace: docs/traceability.csv rows TETHYS-DES-0065..0070 + TETHYS-TST-0085..0096 (land at PR-10)

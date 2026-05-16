@@ -1,0 +1,65 @@
+# Tethys Docker build context exclusions.
+#
+# Every Dockerfile in this directory uses the repo root as build context
+# (so `COPY master/...` lines resolve). Trim the context aggressively to
+# keep `docker build` fast + cache-friendly.
+
+# ---- Version control ----
+.git
+.gitattributes
+.gitignore
+.gitmodules
+
+# ---- IDE / editor noise ----
+.vscode
+.idea
+*.swp
+*.swo
+*.tmp
+.DS_Store
+Thumbs.db
+
+# ---- Python noise ----
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+**/.tox
+**/.venv
+**/.python-version
+**/dist
+**/build
+**/*.egg-info
+
+# ---- CMake / C noise (slave-builder still uses these as input) ----
+slave/build
+slave/cmake-build-*
+**/CMakeCache.txt
+**/CMakeFiles
+**/cmake_install.cmake
+
+# ---- Docs site outputs (built artefacts; the docker images never read them) ----
+docs/site/_build
+docs/site/.venv
+.venv-docs
+
+# ---- Local credentials + keys (defence in depth; should never reach build context) ----
+**/.env
+**/.envrc
+**/credentials.json
+hil/keys/*.key
+hil/recordings
+hil/reports
+hil/artifacts
+
+# ---- Test / fuzz artefacts ----
+slave/fuzz/corpus_runtime
+slave/fuzz/findings
+
+# ---- Existing top-level Docker outputs ----
+**/Dockerfile.local
+**/compose.override.yml
+**/compose.override.yaml

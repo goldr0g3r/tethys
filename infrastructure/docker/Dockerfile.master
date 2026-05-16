@@ -1,0 +1,65 @@
+# syntax=docker/dockerfile:1.7
+# Tethys master tool - PC-side XCP 1.4 master CLI.
+#
+# Build from repo root:
+#   docker build -t tethys-master:dev -f infrastructure/docker/Dockerfile.master .
+#
+# Run:
+#   docker run --rm tethys-master:dev tethys-master version
+#   docker run --rm tethys-master:dev tethys-master connect --target udp://host.docker.internal:5555
+#
+# Cite: parent plan section 3.1 (PC master tool) + section 11 (release artefacts).
+# Cite: ADR-0007 (Python master, not MATLAB).
+# Cite: ADR-0008 (license-free toolchain).
+
+ARG PYTHON_VERSION=3.12.7
+FROM python:${PYTHON_VERSION}-slim-bookworm AS base
+
+# Renovate + Dependabot bump the base tag via PR per .cursor/rules/version-pinning.mdc.
+# A Phase 11 PR will replace the tag with an immutable digest (python@sha256:...).
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/tethys-venv
+
+# uv = Astral's Python package + project manager (Apache-2.0 / MIT).
+ARG UV_VERSION=0.5.4
+RUN pip install --no-cache-dir "uv==${UV_VERSION}"
+
+WORKDIR /workspace
+
+# Copy only the master package + its declared dependencies. Simulator and
+# slave directories are NOT pulled in - keeps the master image clean and
+# layer-cache friendly.
+COPY master/pyproject.toml master/uv.lock master/README.md ./master/
+COPY master/src/ ./master/src/
+
+# Install with the (Phase 1+) dependency set. The `gui` extra is intentionally
+# omitted from the runtime image to keep size low; CI uses a separate image
+# tag (master-gui) when it needs PySide6.
+RUN cd master && uv sync --frozen --no-dev --no-progress
+
+# Drop privileges - container runs as non-root.
+RUN useradd --create-home --shell /usr/sbin/nologin tethys
+USER tethys
+
+WORKDIR /home/tethys
+
+# Make `tethys-master` resolve against the synced venv.
+ENV PATH="/opt/tethys-venv/bin:${PATH}"
+
+# Healthcheck: `tethys-master version` must exit 0 in <2s.
+HEALTHCHECK --interval=30s --timeout=2s --start-period=2s --retries=2 \
+    CMD ["tethys-master", "version"]
+
+ENTRYPOINT ["tethys-master"]
+CMD ["--help"]
+
+LABEL org.opencontainers.image.title="tethys-master" \
+      org.opencontainers.image.description="Tethys XCP master tool - license-free PC-side XCP 1.4 calibration + measurement." \
+      org.opencontainers.image.source="https://github.com/goldr0g3r/tethys" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.documentation="https://github.com/goldr0g3r/tethys/blob/main/master/README.md"

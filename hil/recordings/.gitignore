@@ -1,0 +1,5 @@
+# hil/recordings/ - runtime MDF4 output. Ignore everything except the
+# README and this .gitignore so git keeps the slot but never tracks data.
+*
+!README.md
+!.gitignore
