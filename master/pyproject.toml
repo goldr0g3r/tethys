@@ -24,7 +24,7 @@ classifiers = [
 # Pinned per .cursor/rules/version-pinning.mdc - every dep exact version.
 # Renovate / Dependabot manage upgrades via PR.
 dependencies = [
-    "click==8.1.7",
+    "click==8.4.0",
     "pydantic==2.9.2",
     "pydantic-settings==2.6.1",
     "pyserial==3.5",  # BSD-3 - UART/SxI transport backend (Phase 5 PR-B)
