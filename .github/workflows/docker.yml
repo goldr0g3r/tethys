@@ -1,0 +1,93 @@
+name: docker
+
+# Docker image build + acceptance bench workflow (F5 + F8 of
+# docs/research/phase-0-empty-folders-scaffold.md).
+#
+# F5 - "docker-build": build all three Dockerfiles under
+#   infrastructure/docker/ on every push to main, every PR touching the
+#   docker / master / simulator slots, and every tag (v*). No registry
+#   push - the Phase 11 PR adds GHCR push + the credential dance.
+# F8 - "docker-compose-bench": run the master + simulator compose
+#   acceptance leg (parent plan section 8 Phase 1 acceptance) and
+#   assert the master container exits 0.
+#
+# Status: scaffolded; both jobs run on the PR + push triggers below.
+# The Phase 11 PR will:
+#   1. Add a `docker-push` job behind `if: github.event_name == 'push'`
+#      + `permissions: packages: write` that pushes to ghcr.io.
+#   2. Promote `docker-build` + `docker-compose-bench` to required
+#      status checks in infrastructure/github/branch-protection.json
+#      (project-owner-governed; not touched by this PR).
+#
+# Cite: parent plan section 8 (Phase 1 acceptance bench) + section 11
+# (release / Docker image).
+# Cite: ADR-0008 (license-free toolchain).
+# Cite: .cursor/rules/version-pinning.mdc - every action pinned by
+# commit SHA + a trailing `# vX.Y.Z` comment.
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      - 'infrastructure/docker/**'
+      - 'master/**'
+      - 'simulator/**'
+      - '.github/workflows/docker.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  docker-build:
+    name: docker-build / ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: tethys-master
+            dockerfile: infrastructure/docker/Dockerfile.master
+          - image: tethys-sim
+            dockerfile: infrastructure/docker/Dockerfile.simulator
+          - image: tethys-slave-builder
+            dockerfile: infrastructure/docker/Dockerfile.slave-builder
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
+        with:
+          install: true
+      - name: Build ${{ matrix.image }}
+        uses: docker/build-push-action@48aba3b46d1b1fec4febb7c5d0c644b249a11355 # v6.10.0
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: ${{ matrix.image }}:ci
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,scope=${{ matrix.image }},mode=max
+      - name: Show image metadata
+        run: docker image inspect ${{ matrix.image }}:ci --format '{{ .Id }} {{ .RepoTags }} {{ .Size }} bytes'
+
+  docker-compose-bench:
+    name: docker-compose-bench (master + simulator)
+    runs-on: ubuntu-latest
+    needs: docker-build
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3.7.1
+        with:
+          install: true
+      - name: Compose up (abort-on-container-exit, master exit code)
+        run: |
+          docker compose -f infrastructure/docker/compose.yml \
+            up --build --abort-on-container-exit --exit-code-from master
+      - name: Capture compose logs on failure
+        if: failure()
+        run: docker compose -f infrastructure/docker/compose.yml logs --no-color
+      - name: Tear down
+        if: always()
+        run: docker compose -f infrastructure/docker/compose.yml down --volumes --remove-orphans

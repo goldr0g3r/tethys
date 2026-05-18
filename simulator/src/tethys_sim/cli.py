@@ -2,19 +2,29 @@
 
 Cite: click v8 (https://click.palletsprojects.com/)
 Cite: parent plan section 7 (Phase-1 acceptance bench)
+Cite: parent plan section 8 (Phase 9 HIL bench) - ``plant`` subcommand.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import signal
 import sys
+import time
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import click
 from tethys_master.logging_setup import configure_logging, get_logger
 
 from tethys_sim import __version__
+from tethys_sim.hil.reference_plant import (
+    SUPPORTED_SCENARIOS,
+    BridgeSchemaError,
+    PlantScenario,
+    ReferencePlant,
+)
 from tethys_sim.slave import XcpSimSlave
 
 if TYPE_CHECKING:
@@ -94,4 +104,77 @@ def _supported_signals() -> list[int]:
     return [s for s in candidates if isinstance(s, signal.Signals)]
 
 
-__all__ = ["cli", "serve"]
+def _resolve_scenario_path(scenario: str, repo_root: Path) -> Path:
+    """Allow ``--scenario`` to be a name or an explicit path."""
+    candidate = Path(scenario)
+    if candidate.is_file():
+        return candidate.resolve()
+    by_name = repo_root / "hil" / "scenarios" / f"{scenario}.json"
+    if by_name.is_file():
+        return by_name
+    msg = (
+        f"scenario {scenario!r} not found; tried {candidate!s} and {by_name!s}. "
+        f"Supported scenario kinds (from hil/scenarios/): {SUPPORTED_SCENARIOS}"
+    )
+    raise click.BadParameter(msg)
+
+
+@cli.command()
+@click.option(
+    "--scenario",
+    required=True,
+    help="Scenario name (without .json) or path to a scenario JSON.",
+)
+@click.option(
+    "--once",
+    is_flag=True,
+    default=False,
+    help="Run a single plant step against the current master_out.csv tail and exit.",
+)
+@click.option(
+    "--repo-root",
+    type=click.Path(file_okay=False, dir_okay=True, path_type=Path),
+    default=Path.cwd(),
+    show_default="cwd",
+    help="Repository root - bridge file paths in the scenario JSON resolve under here.",
+)
+def plant(scenario: str, once: bool, repo_root: Path) -> None:
+    """Drive the pure-Python reference plant for ``--scenario``.
+
+    Reads ``hil/master_out.csv`` (schema: ``hil/bridge/master_out.schema.md``),
+    integrates the chosen ODE for one tick (or ``duration_s`` of the
+    scenario JSON when ``--once`` is unset), and writes
+    ``hil/plant_out.csv`` (schema: ``hil/bridge/plant_out.schema.md``).
+    """
+    repo_root_abs = repo_root.resolve()
+    scenario_path = _resolve_scenario_path(scenario, repo_root_abs)
+    try:
+        plant_scenario = PlantScenario.from_json_file(scenario_path)
+    except BridgeSchemaError as exc:
+        raise click.ClickException(str(exc)) from exc
+    runner = ReferencePlant(plant_scenario, repo_root_abs)
+    logger = get_logger("tethys-sim.plant")
+    logger.info(
+        "plant.start",
+        scenario=plant_scenario.name,
+        kind=plant_scenario.kind,
+        sample_time_s=plant_scenario.sample_time_s,
+        once=once,
+    )
+
+    if once:
+        try:
+            wrote = runner.step(now_s=time.monotonic())
+        finally:
+            runner.close()
+        click.echo(f"plant tick complete (wrote_row={wrote})")
+        return
+
+    raw = scenario_path.read_text(encoding="utf-8")
+    duration_s = float(json.loads(raw).get("duration_s", 1.0))
+    written = runner.run(duration_s=duration_s)
+    logger.info("plant.summary", scenario=plant_scenario.name, rows_written=written)
+    click.echo(f"plant finished: rows_written={written}")
+
+
+__all__ = ["cli", "plant", "serve"]

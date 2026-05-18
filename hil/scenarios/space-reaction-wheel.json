@@ -1,0 +1,49 @@
+{
+  "name": "space-reaction-wheel",
+  "profile": "space",
+  "duration_s": 5.0,
+  "transport": {
+    "kind": "uart_sxi",
+    "target": "COM3",
+    "timeout_ms": 2000
+  },
+  "a2l": {
+    "path": "hil/a2l/space-reaction-wheel.a2l",
+    "hash": null
+  },
+  "daq": {
+    "event_channel": 0,
+    "signals": [
+      "wheel_speed_rad_s",
+      "wheel_torque_n_m",
+      "bus_voltage_v",
+      "bearing_temp_c"
+    ],
+    "rate_hz": 200
+  },
+  "plant": {
+    "kind": "space-reaction-wheel",
+    "bridge": {
+      "sample_time_s": 0.005,
+      "watchdog_timeout_s": 0.1,
+      "master_out": "hil/master_out.csv",
+      "plant_out": "hil/plant_out.csv"
+    }
+  },
+  "auth": {
+    "key_file": "hil/keys/space-reaction-wheel.key"
+  },
+  "report_html": "hil/reports/space-reaction-wheel-latest.html",
+  "trace": {
+    "standards": [
+      "ASAM XCP 1.4 Part 2 §1.3.2.4 (CONNECT)",
+      "ASAM XCP 1.4 Part 2 §1.3.5 (seed-and-key)",
+      "ASAM XCP 1.4 Part 2 §1.4 (DAQ)",
+      "NIST FIPS-197 (AES-128)",
+      "ECSS-E-ST-40C Rev.1 §5.4.3.4",
+      "NPR 7150.2D §3",
+      "DO-178C §6.4.4.2 (DAL-B MC/DC)",
+      "CCSDS 232.1-B-2 (COP-1)"
+    ]
+  }
+}

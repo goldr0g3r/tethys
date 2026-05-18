@@ -32,3 +32,7 @@ COMMIT_MSG.tmp
 PR_BODY.tmp
 .git/TETHYS_COMMIT_MSG
 .git/TETHYS_PR_BODY
+
+# Sphinx (F6 of docs/research/phase-0-empty-folders-scaffold.md)
+docs/_build/
+docs/_build_master_docs_mirror/

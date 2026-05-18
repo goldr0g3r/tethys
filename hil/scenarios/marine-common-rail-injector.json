@@ -1,0 +1,44 @@
+{
+  "name": "marine-common-rail-injector",
+  "profile": "marine",
+  "duration_s": 5.0,
+  "transport": {
+    "kind": "udp",
+    "target": "udp://127.0.0.1:5555",
+    "timeout_ms": 1000
+  },
+  "a2l": {
+    "path": "hil/a2l/marine-common-rail-injector.a2l",
+    "hash": null
+  },
+  "daq": {
+    "event_channel": 0,
+    "signals": [
+      "rail_pressure_bar",
+      "injector_duty",
+      "engine_rpm",
+      "coolant_temp_c"
+    ],
+    "rate_hz": 1000
+  },
+  "plant": {
+    "kind": "marine-common-rail-injector",
+    "bridge": {
+      "sample_time_s": 0.001,
+      "watchdog_timeout_s": 0.05,
+      "master_out": "hil/master_out.csv",
+      "plant_out": "hil/plant_out.csv"
+    }
+  },
+  "auth": null,
+  "report_html": "hil/reports/marine-common-rail-injector-latest.html",
+  "trace": {
+    "standards": [
+      "ASAM XCP 1.4 Part 2 §1.3.2.4 (CONNECT)",
+      "ASAM XCP 1.4 Part 2 §1.4 (DAQ)",
+      "IACS UR E22 Rev.3 §5",
+      "IEC 60945 ed.4",
+      "ASAM MCD-2 MC v1.7 §1"
+    ]
+  }
+}

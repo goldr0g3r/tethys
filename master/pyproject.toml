@@ -25,6 +25,7 @@ classifiers = [
 # Renovate / Dependabot manage upgrades via PR.
 dependencies = [
     "click==8.1.7",
+    "jinja2==3.1.4",  # BSD-3 - HIL demo HTML report template (Phase 9 F2)
     "pydantic==2.9.2",
     "pydantic-settings==2.6.1",
     "pyserial==3.5",  # BSD-3 - UART/SxI transport backend (Phase 5 PR-B)

@@ -211,10 +211,25 @@ Full description: [System context](/architecture/system-context).
 /sqap
 ```
 
-<!-- Master-tool internal docs live under `master/docs/`. The Phase 11 PR
-extends `docs/site/conf.py` to pull them in via a MyST include; until then
-they render on the GitHub source view directly. See
-`master/docs/README.md` for the pull plan. -->
+```{toctree}
+:caption: Master tool internals
+:maxdepth: 1
+
+/_build_master_docs_mirror/README
+/_build_master_docs_mirror/installation
+/_build_master_docs_mirror/cli
+/_build_master_docs_mirror/api
+/_build_master_docs_mirror/gui
+/_build_master_docs_mirror/transports
+/_build_master_docs_mirror/profiles
+/_build_master_docs_mirror/index
+```
+
+<!-- The "Master tool internals" pages above live in the source tree
+under `master/docs/*.md` and are mirrored into `docs/_build_master_docs_mirror/`
+at sphinx-build time by the `builder-inited` hook in
+`docs/site/conf.py`. The mirror directory is git-ignored. Edit the
+source files under `master/docs/`, never the mirrored copies. -->
 
 
 ## License
