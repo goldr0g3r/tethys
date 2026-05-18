@@ -22,7 +22,7 @@ jobs:
         working-directory: master
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - run: uv sync --no-progress
       - name: Generate Python SBOM (CycloneDX)
         uses: CycloneDX/gh-python-generate-sbom@39fe80937489538e12de5a7b427e078649ec44bb # v2.0.0
