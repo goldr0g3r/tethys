@@ -25,7 +25,7 @@ classifiers = [
 # Renovate / Dependabot manage upgrades via PR.
 dependencies = [
     "click==8.1.7",
-    "pydantic==2.9.2",
+    "pydantic==2.13.4",
     "pydantic-settings==2.6.1",
     "pyserial==3.5",  # BSD-3 - UART/SxI transport backend (Phase 5 PR-B)
     "structlog==24.4.0",
