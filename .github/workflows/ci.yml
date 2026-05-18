@@ -39,7 +39,7 @@ jobs:
       QT_QPA_PLATFORM: offscreen
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - name: Install Qt runtime libs (Linux only)
         # PySide6 wheels on Linux dlopen libEGL / libGL / libxkbcommon /
         # libfontconfig / libdbus; macOS + Windows wheels are self-contained.
@@ -79,7 +79,7 @@ jobs:
         working-directory: simulator
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a # v4.2.0
+      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
       - run: uv sync --no-progress
       - run: |
           uv run --with ruff ruff check . || true
