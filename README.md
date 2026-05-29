@@ -7,7 +7,10 @@
 [![misra](https://github.com/goldr0g3r/tethys/actions/workflows/misra-gate.yml/badge.svg)](https://github.com/goldr0g3r/tethys/actions/workflows/misra-gate.yml)
 [![fuzz](https://github.com/goldr0g3r/tethys/actions/workflows/fuzz-nightly.yml/badge.svg)](https://github.com/goldr0g3r/tethys/actions/workflows/fuzz-nightly.yml)
 [![ecss-trace](https://github.com/goldr0g3r/tethys/actions/workflows/a2l-roundtrip.yml/badge.svg)](https://github.com/goldr0g3r/tethys/actions/workflows/a2l-roundtrip.yml)
+[![docs](https://github.com/goldr0g3r/tethys/actions/workflows/docs-site.yml/badge.svg)](https://github.com/goldr0g3r/tethys/actions/workflows/docs-site.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+> **Docs site:** [goldr0g3r.github.io/tethys](https://goldr0g3r.github.io/tethys/) — the full `docs/` tree (architecture, ADRs, runbooks, learn, research notes, traceability) rendered by Sphinx + GitHub Pages, auto-deployed on every push to `main` via `docs-site.yml` (Phase 11 PR-A). One-time project-owner enablement: Settings → Pages → "GitHub Actions".
 
 > Badges live since PR #11 (p0-ci) + PR #19 (F5 workflow rename to canonical contexts). Branch protection now requires 7 status checks: `build`, `misra-gate`, `static-analysis`, `coverage`, `secret-scan`, `dependency-review`, `pr-title`.
 
@@ -158,6 +161,19 @@ Step-by-step recipes any engineer can execute. See [`docs/runbooks/README.md`](d
 - [`incident-and-defect.md`](docs/runbooks/incident-and-defect.md) - PR-6: severity matrix, MISRA deviation lifecycle, security incident handling, PIR template.
 - [`supply-chain-and-sbom.md`](docs/runbooks/supply-chain-and-sbom.md) - PR-6: CycloneDX SBOM, Renovate/Dependabot, 90-day PAT rotation, CVE triage, license audit.
 - [`demo-recording.md`](docs/runbooks/demo-recording.md) - PR-6: OBS Studio + DaVinci Resolve + shot lists for both demos.
+
+## Docs site
+
+The complete `docs/` tree is rendered as a public Sphinx + GitHub Pages site at <https://goldr0g3r.github.io/tethys/> (Phase 11 / PR-A; deploys on every push to `main` via [`docs-site.yml`](.github/workflows/docs-site.yml)). One-time project-owner enablement: Settings → Pages → "GitHub Actions".
+
+The site sections mirror this README: architecture, ADRs, runbooks, learn, research notes, traceability, coding standard, MISRA deviations. Build locally with:
+
+```bash
+python -m venv .venv-docs && . .venv-docs/bin/activate
+pip install -r docs/site/requirements.txt
+sphinx-build -W --keep-going -c docs/site -b html docs docs/_build/html
+# Output at docs/_build/html/site/index.html
+```
 
 ## Research notes
 
