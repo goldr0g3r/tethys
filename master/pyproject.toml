@@ -65,7 +65,7 @@ tethys-master = "tethys_master.cli:cli"
 tethys-master-gui = "tethys_master.gui.app:main_cli"
 
 [build-system]
-requires = ["uv_build>=0.9.26,<0.10.0"]
+requires = ["uv_build>=0.9.26,<0.12.0"]
 build-backend = "uv_build"
 
 [tool.uv_build]
